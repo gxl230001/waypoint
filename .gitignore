@@ -1,0 +1,28 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node and Expo
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Generated model files and local datasets
+ml/data/
+ml/exports/
+*.tflite
+*.mlmodel
+*.mlpackage
+
+# IDE and operating system
+.DS_Store
+.idea/
+.vscode/
