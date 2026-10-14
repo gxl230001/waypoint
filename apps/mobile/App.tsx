@@ -15,10 +15,19 @@ import {
   ImuCollectionPanel,
   type ImuSummary,
 } from "./src/imu/ImuCollectionPanel";
+import { HomeScreen } from "./src/screens/HomeScreen";
+import { HELP_TEXT, parseCommand } from "./src/voice/commands";
+import { unavailableRecognizer, type VoiceRecognizer } from "./src/voice/recognizer";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+// Replace with a real recognizer once a development build includes speech
+// recognition. See src/voice/recognizer.ts.
+const recognizer: VoiceRecognizer = unavailableRecognizer;
+
 export default function App() {
+  const [screen, setScreen] = useState<"home" | "tools">("home");
+  const [listening, setListening] = useState(false);
   const [apiStatus, setApiStatus] = useState("Not checked");
   const [navigationActive, setNavigationActive] = useState(false);
   const [imu, setImu] = useState<ImuSummary>({
@@ -122,9 +131,97 @@ export default function App() {
     Speech.speak(message);
   }
 
+  function say(text: string) {
+    setMessage(text);
+    Speech.stop();
+    Speech.speak(text);
+  }
+
+  async function handleSpeakPress() {
+    if (listening) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    if (!recognizer.isAvailable()) {
+      say(
+        "Voice input needs a development build and is not available yet. " +
+          "Open settings and tools to use the buttons."
+      );
+      return;
+    }
+
+    setListening(true);
+    try {
+      const heard = await recognizer.listen();
+      if (heard === null) {
+        say("I did not hear anything. Tap to speak and try again.");
+        return;
+      }
+      runCommand(parseCommand(heard));
+    } catch (error) {
+      console.error("Voice input failed:", error);
+      say("Voice input failed. Please try again.");
+    } finally {
+      setListening(false);
+    }
+  }
+
+  function runCommand(command: ReturnType<typeof parseCommand>) {
+    switch (command) {
+      case "startNavigation":
+        if (!navigationActive) startNavigation();
+        else say("Navigation is already running.");
+        break;
+      case "stopNavigation":
+        if (navigationActive) stopNavigation();
+        else say("Navigation is not running.");
+        break;
+      case "repeat":
+        announceStatus();
+        break;
+      case "status":
+        say(
+          navigationActive
+            ? "Demo navigation is running."
+            : "Navigation is stopped."
+        );
+        break;
+      case "settings":
+        setScreen("tools");
+        break;
+      case "sos":
+        say("Emergency help is not connected in this build yet.");
+        break;
+      case "help":
+        say(HELP_TEXT);
+        break;
+      default:
+        say("Sorry, I did not understand. Say help to hear what you can say.");
+    }
+  }
+
+  if (screen === "home") {
+    return (
+      <HomeScreen
+        message={message}
+        listening={listening}
+        onSpeakPress={() => {
+          void handleSpeakPress();
+        }}
+        onRepeatPress={announceStatus}
+        onOpenTools={() => setScreen("tools")}
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
+        <ActionButton
+          label="Back to home"
+          hint="Returns to the main screen with the speak button."
+          onPress={() => setScreen("home")}
+          primary
+        />
         <Text style={styles.eyebrow}>ACCESSIBLE MOBILITY</Text>
         <Text style={styles.title}>Waypoint</Text>
         <Text style={styles.subtitle}>
