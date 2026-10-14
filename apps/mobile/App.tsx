@@ -9,12 +9,12 @@ import {
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import { ActionButton } from "./src/components/ActionButton";
-import { TrialCounters } from "./src/fall/TrialCounters";
 import { useFallDetector } from "./src/fall/useFallDetector";
 import {
   ImuCollectionPanel,
   type ImuSummary,
 } from "./src/imu/ImuCollectionPanel";
+import { RoutePanel } from "./src/route/RoutePanel";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -189,7 +189,6 @@ export default function App() {
           onPress={fallDetector.stop}
           disabled={!fallDetector.running}
         />
-        <TrialCounters />
 
         <Text style={styles.sectionTitle}>Navigation</Text>
         <ActionButton
@@ -205,12 +204,9 @@ export default function App() {
           disabled={!navigationActive}
         />
 
-        <Text style={styles.sectionTitle}>IMU data collection</Text>
-        <ImuCollectionPanel
-          apiUrl={API_URL}
-          onMessage={handleImuMessage}
-          onSummaryChange={handleImuSummary}
-        />
+
+        <Text style={styles.sectionTitle}>Route guidance (demo)</Text>
+        <RoutePanel onMessage={handleImuMessage} />
 
         <Text style={styles.sectionTitle}>Device and backend</Text>
         <ActionButton
