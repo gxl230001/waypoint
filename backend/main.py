@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers.imu import router as imu_router
+from fall import router as fall_router
+
 
 app = FastAPI(
     title="Waypoint API",
@@ -20,6 +22,8 @@ app.add_middleware(
 )
 
 app.include_router(imu_router)
+app.include_router(fall_router)
+
 
 
 @app.get("/")
