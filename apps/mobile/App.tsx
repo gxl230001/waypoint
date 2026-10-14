@@ -1,61 +1,43 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
+import { ActionButton } from "./src/components/ActionButton";
 import {
-  Accelerometer,
-  Gyroscope,
-  type AccelerometerMeasurement,
-  type GyroscopeMeasurement,
-} from "expo-sensors";
+  ImuCollectionPanel,
+  type ImuSummary,
+} from "./src/imu/ImuCollectionPanel";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
-
-type SensorSample = {
-  timestamp: number;
-  sensor: "accelerometer" | "gyroscope";
-  x: number;
-  y: number;
-  z: number;
-};
 
 export default function App() {
   const [apiStatus, setApiStatus] = useState("Not checked");
   const [navigationActive, setNavigationActive] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [sampleCount, setSampleCount] = useState(0);
+  const [imu, setImu] = useState<ImuSummary>({
+    recording: false,
+    activityLabel: null,
+    totalSamples: 0,
+  });
   const [message, setMessage] = useState(
     "Welcome. Your navigation prototype is ready."
   );
 
-  const samples = useRef<SensorSample[]>([]);
-  const lastUIUpdate = useRef(0);
-
-  const accelerometerSubscription = useRef<ReturnType<
-    typeof Accelerometer.addListener
-  > | null>(null);
-
-  const gyroscopeSubscription = useRef<ReturnType<
-    typeof Gyroscope.addListener
-  > | null>(null);
-
+  // Sensor subscriptions are owned by the IMU panel's recorder hook, which
+  // removes them on stop, on backgrounding, and on unmount.
   useEffect(() => {
-    Accelerometer.setUpdateInterval(100);
-    Gyroscope.setUpdateInterval(100);
-
     return () => {
-      accelerometerSubscription.current?.remove();
-      gyroscopeSubscription.current?.remove();
       Speech.stop();
     };
   }, []);
+
+  const handleImuMessage = useCallback((text: string) => setMessage(text), []);
+  const handleImuSummary = useCallback((summary: ImuSummary) => setImu(summary), []);
 
   async function checkBackend() {
     if (!API_URL) {
@@ -103,62 +85,6 @@ export default function App() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   }
 
-  function startRecording() {
-    if (recording) return;
-
-    samples.current = [];
-    setSampleCount(0);
-
-    const addSample = (
-      sensor: SensorSample["sensor"],
-      reading: AccelerometerMeasurement | GyroscopeMeasurement
-    ) => {
-      samples.current.push({
-        timestamp: Date.now(),
-        sensor,
-        x: reading.x,
-        y: reading.y,
-        z: reading.z,
-      });
-
-      // Avoid rerendering the entire screen for every sensor reading.
-      const now = Date.now();
-      if (now - lastUIUpdate.current >= 500) {
-        lastUIUpdate.current = now;
-        setSampleCount(samples.current.length);
-      }
-    };
-
-    accelerometerSubscription.current = Accelerometer.addListener(
-      (reading) => addSample("accelerometer", reading)
-    );
-
-    gyroscopeSubscription.current = Gyroscope.addListener(
-      (reading) => addSample("gyroscope", reading)
-    );
-
-    setRecording(true);
-    setMessage("Recording sensor samples in memory.");
-    Speech.speak("Sensor recording started.");
-  }
-
-  function stopRecording() {
-    accelerometerSubscription.current?.remove();
-    gyroscopeSubscription.current?.remove();
-
-    accelerometerSubscription.current = null;
-    gyroscopeSubscription.current = null;
-
-    setRecording(false);
-    setSampleCount(samples.current.length);
-    setMessage(
-      `Recording stopped. ${samples.current.length} sensor samples collected.`
-    );
-
-    Speech.speak("Sensor recording stopped.");
-    console.log("Sensor recording:", samples.current);
-  }
-
   async function testHaptics() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setMessage("Haptic feedback test completed.");
@@ -190,10 +116,13 @@ export default function App() {
             Navigation: {navigationActive ? "Active (demo)" : "Stopped"}
           </Text>
           <Text style={styles.statusText}>
-            IMU recording: {recording ? "Recording" : "Idle"}
+            IMU recording:{" "}
+            {imu.recording
+              ? `Recording${imu.activityLabel ? ` (${imu.activityLabel})` : ""}`
+              : "Idle"}
           </Text>
           <Text style={styles.statusText}>
-            Samples collected: {sampleCount}
+            Samples collected: {imu.totalSamples}
           </Text>
         </View>
 
@@ -212,16 +141,10 @@ export default function App() {
         />
 
         <Text style={styles.sectionTitle}>IMU data collection</Text>
-        <ActionButton
-          label="Start Sensor Recording"
-          hint="Records accelerometer and gyroscope samples in temporary memory."
-          onPress={startRecording}
-          disabled={recording}
-        />
-        <ActionButton
-          label="Stop Sensor Recording"
-          onPress={stopRecording}
-          disabled={!recording}
+        <ImuCollectionPanel
+          apiUrl={API_URL}
+          onMessage={handleImuMessage}
+          onSummaryChange={handleImuSummary}
         />
 
         <Text style={styles.sectionTitle}>Device and backend</Text>
@@ -249,54 +172,12 @@ export default function App() {
 
         <Text style={styles.disclaimer}>
           Prototype only. No real route guidance or obstacle detection is
-          available yet. Sensor samples are currently held in memory and
-          are not exported or uploaded.
+          available yet. Sensor recordings are experimental research data,
+          saved on this device as CSV files. They are uploaded only when you
+          tap Upload to Backend.
         </Text>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-type ActionButtonProps = {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  primary?: boolean;
-  hint?: string;
-};
-
-function ActionButton({
-  label,
-  onPress,
-  disabled = false,
-  primary = false,
-  hint,
-}: ActionButtonProps) {
-  return (
-    <TouchableOpacity
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint={hint}
-      accessibilityState={{ disabled }}
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.75}
-      style={[
-        styles.button,
-        primary && styles.primaryButton,
-        disabled && styles.disabledButton,
-      ]}
-    >
-      <Text
-        style={[
-          styles.buttonText,
-          primary && styles.primaryButtonText,
-          disabled && styles.disabledButtonText,
-        ]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
   );
 }
 
@@ -347,37 +228,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#334155",
     marginTop: 6,
-  },
-  button: {
-    minHeight: 56,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#334155",
-    backgroundColor: "#FFFFFF",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  primaryButton: {
-    backgroundColor: "#14213D",
-    borderColor: "#14213D",
-  },
-  buttonText: {
-    textAlign: "center",
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#14213D",
-  },
-  primaryButtonText: {
-    color: "#FFFFFF",
-  },
-  disabledButton: {
-    backgroundColor: "#E2E8F0",
-    borderColor: "#CBD5E1",
-  },
-  disabledButtonText: {
-    color: "#64748B",
   },
   messageCard: {
     marginTop: 16,

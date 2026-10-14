@@ -16,7 +16,9 @@ dist/
 web-build/
 
 # Generated model files and local datasets
-ml/data/
+ml/data/*
+!ml/data/.gitignore
+!ml/data/README.md
 ml/exports/
 *.tflite
 *.mlmodel

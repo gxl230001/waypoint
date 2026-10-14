@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from imu import router as imu_router
+
 app = FastAPI(
     title="Blind Navigation API",
     description="Backend for the low-vision navigation MVP.",
@@ -16,6 +18,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(imu_router)
 
 
 @app.get("/")

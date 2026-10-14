@@ -1,0 +1,4 @@
+# Recorded sensor data is personal research data: keep it out of Git.
+*
+!.gitignore
+!README.md
