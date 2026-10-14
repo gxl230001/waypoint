@@ -6,8 +6,6 @@ import {
   Text,
   View,
 } from "react-native";
-import * as Haptics from "expo-haptics";
-import * as Speech from "expo-speech";
 import { ActionButton } from "./src/components/ActionButton";
 import { ViewToggle } from "./src/components/ViewToggle";
 import { TrialCounters } from "./src/fall/TrialCounters";
@@ -16,9 +14,12 @@ import {
   ImuCollectionPanel,
   type ImuSummary,
 } from "./src/imu/ImuCollectionPanel";
+
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { HELP_TEXT, parseCommand } from "./src/voice/commands";
 import { unavailableRecognizer, type VoiceRecognizer } from "./src/voice/recognizer";
+import { cue } from "./src/services/haptics";
+import { speak, stopSpeaking } from "./src/services/speech";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -53,9 +54,8 @@ export default function App() {
       fallAlertTimerRef.current = null;
     }, 5000);
 
-    Speech.stop();
-    Speech.speak("Fall detected");
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    speak("Fall detected", "hazard");
+    cue("hazard");
   }, []);
 
   const fallDetector = useFallDetector({
@@ -70,7 +70,7 @@ export default function App() {
       if (fallAlertTimerRef.current) {
         clearTimeout(fallAlertTimerRef.current);
       }
-      Speech.stop();
+      stopSpeaking();
     };
   }, []);
 
@@ -108,28 +108,28 @@ export default function App() {
     setNavigationActive(true);
     setMessage("Demo navigation started. Real route guidance is not implemented.");
 
-    Speech.speak(
-      "Demo navigation started. Real route guidance is not implemented."
+    speak(
+      "Demo navigation started. Real route guidance is not implemented.",
+      "direction"
     );
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    cue("confirm");
   }
 
   function stopNavigation() {
     setNavigationActive(false);
     setMessage("Navigation stopped.");
 
-    Speech.stop();
-    Speech.speak("Navigation stopped.");
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    speak("Navigation stopped.", "direction");
+    cue("warning");
   }
 
-  async function testHaptics() {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  function testHaptics() {
+    cue("straight");
     setMessage("Haptic feedback test completed.");
   }
 
   function announceStatus() {
-    Speech.speak(message);
+    speak(message, "direction", { force: true });
   }
 
   function say(text: string) {
