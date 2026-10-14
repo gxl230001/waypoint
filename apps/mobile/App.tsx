@@ -9,6 +9,7 @@ import {
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import { ActionButton } from "./src/components/ActionButton";
+import { ViewToggle } from "./src/components/ViewToggle";
 import { TrialCounters } from "./src/fall/TrialCounters";
 import { useFallDetector } from "./src/fall/useFallDetector";
 import {
@@ -144,7 +145,7 @@ export default function App() {
     if (!recognizer.isAvailable()) {
       say(
         "Voice input needs a development build and is not available yet. " +
-          "Open settings and tools to use the buttons."
+          "Switch to dev view to use the buttons."
       );
       return;
     }
@@ -208,20 +209,19 @@ export default function App() {
           void handleSpeakPress();
         }}
         onRepeatPress={announceStatus}
-        onOpenTools={() => setScreen("tools")}
+        onOpenDevView={() => setScreen("tools")}
       />
     );
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ViewToggle
+        label="User view"
+        hint="Switches to the simple user view with the speak button."
+        onPress={() => setScreen("home")}
+      />
       <ScrollView contentContainerStyle={styles.container}>
-        <ActionButton
-          label="Back to home"
-          hint="Returns to the main screen with the speak button."
-          onPress={() => setScreen("home")}
-          primary
-        />
         <Text style={styles.eyebrow}>ACCESSIBLE MOBILITY</Text>
         <Text style={styles.title}>Waypoint</Text>
         <Text style={styles.subtitle}>

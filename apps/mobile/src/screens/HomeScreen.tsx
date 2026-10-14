@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { ViewToggle } from "../components/ViewToggle";
 
 type HomeScreenProps = {
   /** The latest instruction or status. Shown large in the top half. */
@@ -13,24 +14,29 @@ type HomeScreenProps = {
   listening: boolean;
   onSpeakPress: () => void;
   onRepeatPress: () => void;
-  onOpenTools: () => void;
+  onOpenDevView: () => void;
 };
 
 /**
  * Split screen, built for one hand and no looking:
  *   top half    the latest message in large text. Tap it to hear it again.
  *   bottom half one big "Tap to speak" button.
- * A single small link at the very bottom opens settings and developer tools.
+ * The pill in the top right corner switches to the developer view.
  */
 export function HomeScreen({
   message,
   listening,
   onSpeakPress,
   onRepeatPress,
-  onOpenTools,
+  onOpenDevView,
 }: HomeScreenProps) {
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ViewToggle
+        label="Dev view"
+        hint="Switches to the developer view with settings, sensors and test tools."
+        onPress={onOpenDevView}
+      />
       <TouchableOpacity
         style={styles.topHalf}
         onPress={onRepeatPress}
@@ -58,15 +64,6 @@ export function HomeScreen({
           <Text style={styles.speakButtonText}>
             {listening ? "Listening..." : "Tap to speak"}
           </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.toolsLink}
-          onPress={onOpenTools}
-          accessibilityRole="button"
-          accessibilityLabel="Settings and tools"
-        >
-          <Text style={styles.toolsLinkText}>Settings and tools</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -119,17 +116,5 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: "800",
     color: "#FFFFFF",
-  },
-  toolsLink: {
-    minHeight: 56,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  toolsLinkText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#14213D",
-    textDecorationLine: "underline",
   },
 });
