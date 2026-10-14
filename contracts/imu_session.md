@@ -1,4 +1,4 @@
-# IMU session contract (schema_version 1)
+/# IMU session contract (schema_version 1)
 
 One recording session is a CSV plus a metadata object. The phone produces it;
 the backend validates and stores it unchanged under `ml/data/raw/`.

@@ -15,6 +15,7 @@ import {
   ImuCollectionPanel,
   type ImuSummary,
 } from "./src/imu/ImuCollectionPanel";
+import { SettingsPanel } from "./src/settings/SettingsPanel";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -225,6 +226,9 @@ export default function App() {
           label="Read Current Status Aloud"
           onPress={announceStatus}
         />
+
+        <Text style={styles.sectionTitle}>Settings</Text>
+        <SettingsPanel />
 
         <View
           accessible
