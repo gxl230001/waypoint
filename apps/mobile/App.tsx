@@ -7,18 +7,29 @@ import {
   View,
 } from "react-native";
 import { ActionButton } from "./src/components/ActionButton";
+import { ViewToggle } from "./src/components/ViewToggle";
 import { TrialCounters } from "./src/fall/TrialCounters";
 import { useFallDetector } from "./src/fall/useFallDetector";
 import {
   ImuCollectionPanel,
   type ImuSummary,
 } from "./src/imu/ImuCollectionPanel";
+
+import { HomeScreen } from "./src/screens/HomeScreen";
+import { HELP_TEXT, parseCommand } from "./src/voice/commands";
+import { unavailableRecognizer, type VoiceRecognizer } from "./src/voice/recognizer";
 import { cue } from "./src/services/haptics";
 import { speak, stopSpeaking } from "./src/services/speech";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+// Replace with a real recognizer once a development build includes speech
+// recognition. See src/voice/recognizer.ts.
+const recognizer: VoiceRecognizer = unavailableRecognizer;
+
 export default function App() {
+  const [screen, setScreen] = useState<"home" | "tools">("home");
+  const [listening, setListening] = useState(false);
   const [apiStatus, setApiStatus] = useState("Not checked");
   const [navigationActive, setNavigationActive] = useState(false);
   const [imu, setImu] = useState<ImuSummary>({
@@ -121,8 +132,95 @@ export default function App() {
     speak(message, "direction", { force: true });
   }
 
+  function say(text: string) {
+    setMessage(text);
+    Speech.stop();
+    Speech.speak(text);
+  }
+
+  async function handleSpeakPress() {
+    if (listening) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    if (!recognizer.isAvailable()) {
+      say(
+        "Voice input needs a development build and is not available yet. " +
+          "Switch to dev view to use the buttons."
+      );
+      return;
+    }
+
+    setListening(true);
+    try {
+      const heard = await recognizer.listen();
+      if (heard === null) {
+        say("I did not hear anything. Tap to speak and try again.");
+        return;
+      }
+      runCommand(parseCommand(heard));
+    } catch (error) {
+      console.error("Voice input failed:", error);
+      say("Voice input failed. Please try again.");
+    } finally {
+      setListening(false);
+    }
+  }
+
+  function runCommand(command: ReturnType<typeof parseCommand>) {
+    switch (command) {
+      case "startNavigation":
+        if (!navigationActive) startNavigation();
+        else say("Navigation is already running.");
+        break;
+      case "stopNavigation":
+        if (navigationActive) stopNavigation();
+        else say("Navigation is not running.");
+        break;
+      case "repeat":
+        announceStatus();
+        break;
+      case "status":
+        say(
+          navigationActive
+            ? "Demo navigation is running."
+            : "Navigation is stopped."
+        );
+        break;
+      case "settings":
+        setScreen("tools");
+        break;
+      case "sos":
+        say("Emergency help is not connected in this build yet.");
+        break;
+      case "help":
+        say(HELP_TEXT);
+        break;
+      default:
+        say("Sorry, I did not understand. Say help to hear what you can say.");
+    }
+  }
+
+  if (screen === "home") {
+    return (
+      <HomeScreen
+        message={message}
+        listening={listening}
+        onSpeakPress={() => {
+          void handleSpeakPress();
+        }}
+        onRepeatPress={announceStatus}
+        onOpenDevView={() => setScreen("tools")}
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ViewToggle
+        label="User view"
+        hint="Switches to the simple user view with the speak button."
+        onPress={() => setScreen("home")}
+      />
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.eyebrow}>ACCESSIBLE MOBILITY</Text>
         <Text style={styles.title}>Waypoint</Text>
