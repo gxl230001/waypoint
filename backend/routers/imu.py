@@ -57,7 +57,7 @@ def raw_data_dir() -> Path:
     override = os.environ.get("WAYPOINT_RAW_DATA_DIR")
     if override:
         return Path(override)
-    return Path(__file__).resolve().parent.parent / "ml" / "data" / "raw"
+    return Path(__file__).resolve().parents[2] / "ml" / "data" / "raw"
 
 
 class SensorStatsIn(BaseModel):

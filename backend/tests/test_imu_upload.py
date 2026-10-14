@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import imu  # noqa: E402
+from routers import imu  # noqa: E402
 from main import app  # noqa: E402
 
 FIXTURE = Path(__file__).parent / "fixtures" / "ts_generated_session.json"
