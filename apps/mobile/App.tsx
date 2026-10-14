@@ -15,6 +15,8 @@ import {
   ImuCollectionPanel,
   type ImuSummary,
 } from "./src/imu/ImuCollectionPanel";
+import { SosModal } from "./src/sos/SosModal";
+import { useSos } from "./src/sos/useSos";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -47,6 +49,25 @@ export default function App() {
     Speech.speak("Fall detected");
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
   }, []);
+
+  const sos = useSos({
+    speak: (text) => {
+      Speech.stop();
+      Speech.speak(text);
+    },
+    haptic: (kind) => {
+      if (kind === "tick") {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else if (kind === "warning") {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } else {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    },
+    // Settings are not part of this branch yet, so SOS uses the default demo
+    // number. Pass the saved emergency contact here once settings are merged.
+    getContact: () => null,
+  });
 
   const fallDetector = useFallDetector({
     apiUrl: API_URL,
@@ -191,6 +212,14 @@ export default function App() {
         />
         <TrialCounters />
 
+        <Text style={styles.sectionTitle}>Emergency</Text>
+        <ActionButton
+          label="Emergency SOS (demo)"
+          hint="Starts a ten second countdown, then asks you to confirm. No real call is placed."
+          onPress={() => sos.trigger("manual")}
+          disabled={sos.state.phase !== "idle"}
+        />
+
         <Text style={styles.sectionTitle}>Navigation</Text>
         <ActionButton
           label="Start Demo Navigation"
@@ -242,6 +271,12 @@ export default function App() {
           tap Upload to Backend.
         </Text>
       </ScrollView>
+      <SosModal
+        state={sos.state}
+        onConfirm={sos.confirm}
+        onCancel={sos.cancel}
+        onDismiss={sos.dismiss}
+      />
     </SafeAreaView>
   );
 }
