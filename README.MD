@@ -9,7 +9,7 @@ The current demo includes a React Native mobile app built with Expo and a FastAP
 ## 1. Project Structure
 
 ```text
-blind-nav/
+waypoint/
 ├── apps/
 │   └── mobile/          # React Native + Expo app
 │       ├── App.tsx
@@ -47,7 +47,7 @@ Clone the repository URL shared by the project owner:
 
 ```bash
 git clone <REPOSITORY_URL>
-cd blind-nav
+cd waypoint
 ```
 
 Replace `<REPOSITORY_URL>` with the actual Git repository URL.
@@ -168,7 +168,7 @@ The health check should return:
 Open a third terminal window and navigate to the mobile app:
 
 ```bash
-cd blind-nav/apps/mobile
+cd waypoint/apps/mobile
 ```
 
 Sign in to Expo if necessary:
