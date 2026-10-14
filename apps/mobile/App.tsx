@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -9,6 +9,8 @@ import {
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import { ActionButton } from "./src/components/ActionButton";
+import { TrialCounters } from "./src/fall/TrialCounters";
+import { useFallDetector } from "./src/fall/useFallDetector";
 import {
   ImuCollectionPanel,
   type ImuSummary,
@@ -24,14 +26,40 @@ export default function App() {
     activityLabel: null,
     totalSamples: 0,
   });
+  const [fallAlert, setFallAlert] = useState<{ probability: number } | null>(null);
   const [message, setMessage] = useState(
     "Welcome. Your navigation prototype is ready."
   );
+
+  const fallAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleFall = useCallback((probability: number) => {
+    setFallAlert({ probability });
+    if (fallAlertTimerRef.current) {
+      clearTimeout(fallAlertTimerRef.current);
+    }
+    fallAlertTimerRef.current = setTimeout(() => {
+      setFallAlert(null);
+      fallAlertTimerRef.current = null;
+    }, 5000);
+
+    Speech.stop();
+    Speech.speak("Fall detected");
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+  }, []);
+
+  const fallDetector = useFallDetector({
+    apiUrl: API_URL,
+    onFall: handleFall,
+  });
 
   // Sensor subscriptions are owned by the IMU panel's recorder hook, which
   // removes them on stop, on backgrounding, and on unmount.
   useEffect(() => {
     return () => {
+      if (fallAlertTimerRef.current) {
+        clearTimeout(fallAlertTimerRef.current);
+      }
       Speech.stop();
     };
   }, []);
@@ -124,7 +152,44 @@ export default function App() {
           <Text style={styles.statusText}>
             Samples collected: {imu.totalSamples}
           </Text>
+          <Text style={styles.statusText}>
+            Fall detection:{" "}
+            {fallDetector.running
+              ? `Running (p=${(fallDetector.probability ?? 0).toFixed(2)})`
+              : "Stopped"}
+          </Text>
         </View>
+
+        {fallAlert && (
+          <View
+            accessible
+            accessibilityRole="alert"
+            accessibilityLiveRegion="assertive"
+            style={styles.fallBanner}
+          >
+            <Text style={styles.fallBannerTitle}>FALL DETECTED</Text>
+            <Text style={styles.fallBannerSubtitle}>
+              Fall confidence score: {fallAlert.probability.toFixed(2)}
+            </Text>
+          </View>
+        )}
+
+        <Text style={styles.sectionTitle}>Fall detection</Text>
+        <ActionButton
+          label="Start Fall Detection"
+          hint="Starts continuous fall detection model inference."
+          onPress={() => {
+            void fallDetector.start();
+          }}
+          disabled={fallDetector.running || imu.recording}
+          primary
+        />
+        <ActionButton
+          label="Stop Fall Detection"
+          onPress={fallDetector.stop}
+          disabled={!fallDetector.running}
+        />
+        <TrialCounters />
 
         <Text style={styles.sectionTitle}>Navigation</Text>
         <ActionButton
@@ -245,5 +310,26 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: "#475569",
     marginTop: 20,
+  },
+  fallBanner: {
+    backgroundColor: "#FDECEC",
+    borderWidth: 2,
+    borderColor: "#9B1C1C",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  fallBannerTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#9B1C1C",
+    textAlign: "center",
+  },
+  fallBannerSubtitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#9B1C1C",
+    textAlign: "center",
+    marginTop: 4,
   },
 });
