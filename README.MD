@@ -20,7 +20,8 @@ waypoint/
 │           └── imu/         # IMU recording: recorder hook, CSV, storage, upload, UI panel
 ├── backend/             # FastAPI backend
 │   ├── main.py
-│   ├── imu.py           # POST /api/v1/imu/recordings
+│   ├── routers/
+│   │   └── imu.py       # POST /api/v1/imu/recordings
 │   ├── tests/           # pytest suite for the upload endpoint
 │   ├── requirements.txt
 │   └── requirements-dev.txt

@@ -2,7 +2,7 @@ import type { ImuSample, SessionMetadata } from "./types";
 
 /**
  * Raw long-form schema: one row per sensor reading.
- * Keep in sync with backend/imu.py (EXPECTED_COLUMNS) and the README.
+ * Keep in sync with backend/routers/imu.py (EXPECTED_COLUMNS) and the README.
  */
 export const CSV_COLUMNS = [
   "session_id",

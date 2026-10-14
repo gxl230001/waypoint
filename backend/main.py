@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from imu import router as imu_router
+from routers.imu import router as imu_router
 
 app = FastAPI(
-    title="Blind Navigation API",
+    title="Waypoint API",
     description="Backend for the low-vision navigation MVP.",
     version="0.1.0",
 )
@@ -25,7 +25,7 @@ app.include_router(imu_router)
 @app.get("/")
 def root():
     return {
-        "name": "Blind Navigation API",
+        "name": "Waypoint API",
         "status": "running",
         "version": "0.1.0",
     }
