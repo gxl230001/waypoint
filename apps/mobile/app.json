@@ -22,7 +22,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Waypoint listens for your voice commands, including saying I am okay to cancel an emergency call.",
+          "speechRecognitionPermission": "Waypoint uses speech recognition to understand your voice commands."
+        }
+      ]
     ]
   }
 }

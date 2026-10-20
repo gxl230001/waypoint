@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -14,27 +14,25 @@ import {
   ImuCollectionPanel,
   type ImuSummary,
 } from "./src/imu/ImuCollectionPanel";
+import type { SosReason } from "./src/sos/sosMachine";
+import { useSos } from "./src/sos/useSos";
 import { SettingsPanel } from "./src/settings/SettingsPanel";
+import { getSettings } from "./src/settings/settingsStore";
 
 import { HomeScreen, type UserViewMode } from "./src/screens/HomeScreen";
 import { HELP_TEXT, parseCommand } from "./src/voice/commands";
-import { unavailableRecognizer, type VoiceRecognizer } from "./src/voice/recognizer";
+import { useVoiceInput } from "./src/voice/useVoiceInput";
+import { routeTranscript } from "./src/voice/voiceRouter";
 import { cue } from "./src/services/haptics";
-import { speak, stopSpeaking } from "./src/services/speech";
+import { isSpeakingOrJustSpoke, speak, stopSpeaking } from "./src/services/speech";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const DEMO_DESTINATION = "JO 4.102";
 const DEMO_INSTRUCTION = "Keep walking 40 steps\nTurn left in 2 minutes";
-const SOS_MESSAGE = "SOS. Please respond.";
-
-// Replace with a real recognizer once a development build includes speech
-// recognition. See src/voice/recognizer.ts.
-const recognizer: VoiceRecognizer = unavailableRecognizer;
 
 export default function App() {
   const [screen, setScreen] = useState<"home" | "tools">("home");
-  const [listening, setListening] = useState(false);
   const [apiStatus, setApiStatus] = useState("Not checked");
   const [navigationActive, setNavigationActive] = useState(false);
   const [imu, setImu] = useState<ImuSummary>({
@@ -43,18 +41,79 @@ export default function App() {
     totalSamples: 0,
   });
   const [fallAlert, setFallAlert] = useState<{ probability: number } | null>(null);
-  const [sosActive, setSosActive] = useState(false);
   const [message, setMessage] = useState(
     "Welcome. Tap to chat, or start navigation."
   );
 
+  const sosTriggerRef = useRef<(reason?: SosReason) => void>(() => {});
+
+  const screenRef = useRef(screen);
+  screenRef.current = screen;
+
+  // SOS only exists in the user view. A fall seen while the dev tools are open
+  // is a test, so it must not start the countdown.
   const handleFall = useCallback((probability: number) => {
+    if (screenRef.current !== "home") return;
     setFallAlert({ probability });
-    setSosActive(true);
-    setMessage(SOS_MESSAGE);
-    speak(SOS_MESSAGE, "hazard");
-    cue("hazard");
+    sosTriggerRef.current("fall");
   }, []);
+
+  const sos = useSos({
+    speak: (text) => {
+      speak(text, "hazard", { force: true });
+    },
+    haptic: (kind) => {
+      cue(kind === "tick" ? "straight" : kind === "warning" ? "hazard" : "confirm");
+    },
+    getContact: () => getSettings().emergencyContact,
+  });
+  sosTriggerRef.current = sos.trigger;
+
+  const sosActive = sos.state.phase !== "idle";
+
+  // When the SOS flow ends (cancelled, or "Done" after the demo call), go back
+  // to the normal user screen (idle, or navigation if it was running).
+  const sosWasActive = useRef(false);
+  useEffect(() => {
+    if (sosActive) {
+      sosWasActive.current = true;
+      return;
+    }
+    if (!sosWasActive.current) return;
+    sosWasActive.current = false;
+    setFallAlert(null);
+    setMessage(
+      navigationActive
+        ? `Headed to ${DEMO_DESTINATION}. ${DEMO_INSTRUCTION.replace(/\n/g, ". ")}`
+        : "Back to the main screen."
+    );
+  }, [sosActive, navigationActive]);
+
+  // The microphone stays open for the whole app. Phrases are routed by
+  // runVoiceAction, which always sees the latest state through this ref.
+  const lastSosVoiceAt = useRef(0);
+  const voiceHandlerRef = useRef<(text: string, isFinal: boolean) => void>(() => {});
+  const voice = useVoiceInput((text, isFinal) => voiceHandlerRef.current(text, isFinal));
+  const listening = voice.status === "listening";
+  voiceHandlerRef.current = (text, isFinal) => {
+    const action = routeTranscript(text, isFinal, {
+      sosPhase: sos.state.phase,
+      assistantSpeaking: isSpeakingOrJustSpoke(),
+    });
+    if (action === null) return;
+
+    if (action.type === "sosReply") {
+      // One utterance produces several partial results. Act once.
+      const now = Date.now();
+      if (now - lastSosVoiceAt.current < 1500) return;
+      lastSosVoiceAt.current = now;
+      if (action.reply === "confirm") sos.confirm();
+      else if (action.reply === "cancel") sos.cancel();
+      else sos.dismiss();
+      return;
+    }
+    runCommand(action.command);
+  };
 
   const fallDetector = useFallDetector({
     apiUrl: API_URL,
@@ -121,24 +180,6 @@ export default function App() {
     cue("warning");
   }
 
-  function activateSos() {
-    setSosActive(true);
-    setMessage(SOS_MESSAGE);
-    speak(SOS_MESSAGE, "hazard");
-    cue("hazard");
-  }
-
-  function dismissSos() {
-    setSosActive(false);
-    setFallAlert(null);
-    const next = navigationActive
-      ? `Headed to ${DEMO_DESTINATION}. ${DEMO_INSTRUCTION.replace(/\n/g, ". ")}`
-      : "SOS cancelled.";
-    setMessage(next);
-    speak(next, "direction", { force: true });
-    cue("confirm");
-  }
-
   function testHaptics() {
     cue("straight");
     setMessage("Haptic feedback test completed.");
@@ -153,49 +194,37 @@ export default function App() {
     speak(text, "info", { force: true });
   }
 
+  // The mic button is a fallback and a reminder: voice is always on, so it
+  // explains what to say, or tries to turn listening on if it is off.
   async function handleSpeakPress() {
-    if (listening) return;
     cue("confirm");
-
-    if (!recognizer.isAvailable()) {
+    if (voice.status === "listening") {
+      say(HELP_TEXT);
+      return;
+    }
+    if (voice.status === "unavailable") {
       say(
         "Voice input needs a development build and is not available yet. " +
           "Switch to dev view to use the buttons."
       );
       return;
     }
-
-    setListening(true);
-    try {
-      const heard = await recognizer.listen();
-      if (heard === null) {
-        say("I did not hear anything. Tap to speak and try again.");
-        return;
-      }
-      runCommand(parseCommand(heard));
-    } catch (error) {
-      console.error("Voice input failed:", error);
-      say("Voice input failed. Please try again.");
-    } finally {
-      setListening(false);
-    }
+    await voice.enable();
+    say(
+      voice.status === "denied"
+        ? "Microphone access is off. Turn it on in Settings to use your voice."
+        : "I am listening. " + HELP_TEXT
+    );
   }
 
-  function runCommand(command: ReturnType<typeof parseCommand>) {
+  // Only called while SOS is idle: during SOS the router accepts SOS replies only.
+  function runCommand(command: Exclude<ReturnType<typeof parseCommand>, "unknown">) {
     switch (command) {
       case "startNavigation":
-        if (sosActive) {
-          say("SOS is active. Say I am okay to cancel it first.");
-          break;
-        }
         if (!navigationActive) startNavigation();
         else say("Navigation is already running.");
         break;
       case "stopNavigation":
-        if (sosActive) {
-          dismissSos();
-          break;
-        }
         if (navigationActive) stopNavigation();
         else say("Navigation is not running.");
         break;
@@ -203,10 +232,6 @@ export default function App() {
         announceStatus();
         break;
       case "status":
-        if (sosActive) {
-          say(SOS_MESSAGE);
-          break;
-        }
         say(
           navigationActive
             ? `Headed to ${DEMO_DESTINATION}.`
@@ -215,19 +240,22 @@ export default function App() {
         break;
       case "settings":
         setScreen("tools");
+        say("Opening settings in the developer view. Say user view to return.");
+        break;
+      case "userView":
+        setScreen("home");
+        say("Back to the main screen.");
         break;
       case "sos":
-        activateSos();
+        if (screen === "home") sos.trigger("voice");
+        else say("SOS is only available in the user view. Say user view to go back.");
         break;
       case "cancelSos":
-        if (sosActive) dismissSos();
-        else say("SOS is not active.");
+        say("SOS is not active.");
         break;
       case "help":
         say(HELP_TEXT);
         break;
-      default:
-        say("Sorry, I did not understand. Say help to hear what you can say.");
     }
   }
 
@@ -249,6 +277,10 @@ export default function App() {
         }}
         onRepeatPress={announceStatus}
         onOpenDevView={() => setScreen("tools")}
+        sos={sos.state}
+        onSosOkay={sos.cancel}
+        onSosConfirm={sos.confirm}
+        onSosDismiss={sos.dismiss}
       />
     );
   }

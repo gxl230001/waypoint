@@ -17,6 +17,8 @@ test("recognizes each command", () => {
     ["repeat that", "repeat"],
     ["say that again", "repeat"],
     ["open settings", "settings"],
+    ["go to user view", "userView"],
+    ["go home", "userView"],
     ["what is the status", "status"],
     ["where am I", "status"],
     ["what can I say", "help"],
