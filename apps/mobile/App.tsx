@@ -14,6 +14,7 @@ import {
   ImuCollectionPanel,
   type ImuSummary,
 } from "./src/imu/ImuCollectionPanel";
+import { SettingsPanel } from "./src/settings/SettingsPanel";
 
 import { HomeScreen, type UserViewMode } from "./src/screens/HomeScreen";
 import { HELP_TEXT, parseCommand } from "./src/voice/commands";
@@ -360,6 +361,9 @@ export default function App() {
           label="Read Current Status Aloud"
           onPress={announceStatus}
         />
+
+        <Text style={styles.sectionTitle}>Settings</Text>
+        <SettingsPanel />
 
         <View
           accessible
