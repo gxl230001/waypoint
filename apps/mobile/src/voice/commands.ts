@@ -11,6 +11,7 @@ export type VoiceCommand =
   | "sos"
   | "repeat"
   | "settings"
+  | "userView"
   | "status"
   | "stopNavigation"
   | "startNavigation"
@@ -29,6 +30,7 @@ const RULES: ReadonlyArray<{ command: VoiceCommand; pattern: RegExp }> = [
       /\b(sos|emergency|help me|need help|call 911|call for help|i fell|i have fallen|i fell down)\b/,
   },
   { command: "repeat", pattern: /\b(repeat|say that again|again|what did you say)\b/ },
+  { command: "userView", pattern: /\b(user view|main screen|home screen|go home|go back)\b/ },
   { command: "settings", pattern: /\b(settings?|options|preferences)\b/ },
   { command: "status", pattern: /\b(status|where am i|what is happening)\b/ },
   { command: "stopNavigation", pattern: /\b(stop|end|pause|quit)\b/ },
@@ -55,4 +57,36 @@ export function parseCommand(text: string): VoiceCommand {
 }
 
 export const HELP_TEXT =
-  "You can say: start navigation, stop, repeat, status, settings, I am okay, or help me for emergencies.";
+  "You can say: start navigation, stop, repeat, status, settings, user view, I am okay, or help me for emergencies.";
+
+export type SosPhase = "idle" | "countdown" | "confirm" | "called";
+export type SosReply = "confirm" | "cancel" | "dismiss";
+
+const SOS_CANCEL =
+  /\b(cancel sos|false alarm|i am okay|im okay|i am ok|im ok|i am fine|im fine|i am alright|im alright|cancel|no|stop)\b/;
+const SOS_CONFIRM = /\b(yes|yeah|yep|call|help|help me|need help)\b/;
+const SOS_DISMISS = /\b(done|ok|okay|close|dismiss|thanks|thank you)\b/;
+
+/**
+ * What a spoken reply means while the SOS flow is on screen. Returns null for
+ * anything that is not a clear answer, so background talk is ignored. Cancel
+ * is checked first so "no, I am okay" can never start a call.
+ */
+export function parseSosReply(text: string, phase: SosPhase): SosReply | null {
+  const normalized = normalizeSpeech(text);
+  if (normalized === "") return null;
+
+  if (phase === "countdown") {
+    return SOS_CANCEL.test(normalized) ? "cancel" : null;
+  }
+  if (phase === "confirm") {
+    if (SOS_CANCEL.test(normalized)) return "cancel";
+    return SOS_CONFIRM.test(normalized) ? "confirm" : null;
+  }
+  if (phase === "called") {
+    return SOS_DISMISS.test(normalized) || SOS_CANCEL.test(normalized)
+      ? "dismiss"
+      : null;
+  }
+  return null;
+}

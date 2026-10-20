@@ -52,3 +52,8 @@ export function stopSpeaking(): void {
 export function lastSpoken(): string | null {
   return queue.getLastSpoken();
 }
+
+/** True while the app is speaking, and for `ms` afterwards (default 700). */
+export function isSpeakingOrJustSpoke(ms = 700): boolean {
+  return !queue.isQuietFor(ms);
+}

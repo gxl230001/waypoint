@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { ViewToggle } from "../components/ViewToggle";
+import { describeDemoCall, targetLabel, type SosState } from "../sos/sosMachine";
 
 export type UserViewMode = "idle" | "navigating" | "sos";
 
@@ -20,6 +21,11 @@ type HomeScreenProps = {
   onSpeakPress: () => void;
   onRepeatPress: () => void;
   onOpenDevView: () => void;
+  /** Where the SOS flow is. Only read when mode is "sos". */
+  sos: SosState;
+  onSosOkay: () => void;
+  onSosConfirm: () => void;
+  onSosDismiss: () => void;
 };
 
 const BLUE = "#1B4FE0";
@@ -39,6 +45,10 @@ export function HomeScreen({
   onSpeakPress,
   onRepeatPress,
   onOpenDevView,
+  sos: sosState,
+  onSosOkay,
+  onSosConfirm,
+  onSosDismiss,
 }: HomeScreenProps) {
   const sos = mode === "sos";
   const backgroundColor = sos ? RED : BLUE;
@@ -46,12 +56,15 @@ export function HomeScreen({
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]}>
       <StatusBar style="light" />
-      <ViewToggle
-        label="Dev view"
-        hint="Switches to the developer view with settings, sensors and test tools."
-        onPress={onOpenDevView}
-        onDark
-      />
+      {/* No way out of the SOS screen except answering it. */}
+      {!sos && (
+        <ViewToggle
+          label="Dev view"
+          hint="Switches to the developer view with settings, sensors and test tools."
+          onPress={onOpenDevView}
+          onDark
+        />
+      )}
 
       <Text
         accessibilityRole="header"
@@ -75,9 +88,12 @@ export function HomeScreen({
 
       {mode === "sos" ? (
         <SosView
+          state={sosState}
           listening={listening}
-          onSpeakPress={onSpeakPress}
           onRepeatPress={onRepeatPress}
+          onOkay={onSosOkay}
+          onConfirm={onSosConfirm}
+          onDismiss={onSosDismiss}
         />
       ) : null}
     </SafeAreaView>
@@ -161,14 +177,30 @@ function NavigationView({
 }
 
 function SosView({
+  state,
   listening,
-  onSpeakPress,
   onRepeatPress,
+  onOkay,
+  onConfirm,
+  onDismiss,
 }: {
+  state: SosState;
   listening: boolean;
-  onSpeakPress: () => void;
   onRepeatPress: () => void;
+  onOkay: () => void;
+  onConfirm: () => void;
+  onDismiss: () => void;
 }) {
+  const counting = state.phase === "countdown" || state.phase === "confirm";
+  const headline =
+    state.phase === "countdown"
+      ? `Calling ${targetLabel(state.target)} in ${state.secondsLeft}`
+      : state.phase === "confirm"
+        ? `Do you need help?\nCalling in ${state.secondsLeft}`
+        : state.phase === "called"
+          ? describeDemoCall(state.target)
+          : "SOS\nPlease Respond";
+
   return (
     <View style={styles.stack}>
       <View style={styles.glyphArea}>
@@ -176,7 +208,7 @@ function SosView({
           accessible
           accessibilityRole="alert"
           accessibilityLiveRegion="assertive"
-          accessibilityLabel="SOS. Fall or trip detected. Double tap to hear the alert again."
+          accessibilityLabel="SOS. Double tap to hear the alert again."
           onPress={onRepeatPress}
           activeOpacity={0.9}
           style={styles.sosBadge}
@@ -185,23 +217,63 @@ function SosView({
         </TouchableOpacity>
       </View>
 
-      <View
-        accessible
-        accessibilityRole="text"
-        style={styles.pill}
-      >
-        <Text style={styles.instructionText}>
-          {listening ? "Listening..." : "SOS\nPlease Respond"}
-        </Text>
+      <View accessible accessibilityRole="text" style={styles.pill}>
+        {state.phase === "called" ? (
+          <Text style={styles.demoBadge}>DEMO ONLY</Text>
+        ) : null}
+        <Text style={styles.instructionText}>{headline}</Text>
       </View>
 
-      <SpeakerControl
-        label="Speak"
-        hint="Double tap to speak a response, such as I am okay."
-        onPress={onSpeakPress}
-        busy={listening}
-      />
+      {state.phase === "confirm" ? (
+        <SosButton
+          label="Yes, call now"
+          hint="Calls for help right away. Demo only, no real call is placed."
+          onPress={onConfirm}
+        />
+      ) : null}
+      {counting ? (
+        <SosButton
+          label="I'm OK"
+          hint="Cancels the emergency call. You can also say I am okay."
+          onPress={onOkay}
+          primary
+        />
+      ) : null}
+      {state.phase === "called" ? (
+        <SosButton label="Done" hint="Returns to the main screen." onPress={onDismiss} primary />
+      ) : null}
+
+      <Text style={styles.sosListening} accessibilityElementsHidden>
+        {listening ? "Listening: say I'm okay" : ""}
+      </Text>
     </View>
+  );
+}
+
+function SosButton({
+  label,
+  hint,
+  onPress,
+  primary = false,
+}: {
+  label: string;
+  hint: string;
+  onPress: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.sosButton, primary && styles.sosButtonPrimary]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      activeOpacity={0.8}
+    >
+      <Text style={[styles.sosButtonText, primary && styles.sosButtonTextPrimary]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -403,6 +475,46 @@ const styles = StyleSheet.create({
     fontSize: 92,
     fontWeight: "800",
     letterSpacing: 2,
+  },
+  demoBadge: {
+    alignSelf: "center",
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+    color: "#14213D",
+    backgroundColor: "#FDE68A",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 8,
+    overflow: "hidden",
+  },
+  sosButton: {
+    marginTop: 14,
+    width: "100%",
+    minHeight: 72,
+    borderRadius: 18,
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sosButtonPrimary: {
+    backgroundColor: "#FFFFFF",
+  },
+  sosButtonText: {
+    color: "#FFFFFF",
+    fontSize: 26,
+    fontWeight: "800",
+  },
+  sosButtonTextPrimary: {
+    color: RED,
+  },
+  sosListening: {
+    marginTop: 12,
+    color: "#FEE2E2",
+    fontSize: 16,
+    minHeight: 22,
   },
   speakerWrap: {
     marginTop: "auto",

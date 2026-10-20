@@ -167,7 +167,7 @@ export function describeTransition(
     return {
       speech:
         `Emergency help requested. Calling ${targetLabel(next.target)} in ` +
-        `${next.secondsLeft} seconds. Tap cancel if you are okay.`,
+        `${next.secondsLeft} seconds. Say I am okay, or tap I'm OK, to cancel.`,
       haptic: "warning",
     };
   }
@@ -182,7 +182,7 @@ export function describeTransition(
   if (next.phase === "confirm" && prev.phase === "countdown") {
     return {
       speech:
-        `Do you need help? Tap yes to call ${targetLabel(next.target)}, or tap no to ` +
+        `Do you need help? Say yes to call ${targetLabel(next.target)}, or say I am okay to ` +
         `cancel. Calling automatically in ${next.secondsLeft} seconds.`,
       haptic: "warning",
     };

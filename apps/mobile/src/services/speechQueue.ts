@@ -45,6 +45,8 @@ export class SpeechQueue {
   private readonly recent = new Map<string, number>();
   /** Callbacks from an utterance that was replaced or stopped are ignored. */
   private generation = 0;
+  /** When speech last started or finished. Used to ignore the speaker's own echo. */
+  private lastActiveAt = Number.NEGATIVE_INFINITY;
 
   constructor(engine: SpeechEngine, options: SpeechQueueOptions = {}) {
     this.engine = engine;
@@ -97,6 +99,7 @@ export class SpeechQueue {
     this.generation += 1;
     if (this.speaking) this.engine.stop();
     this.speaking = null;
+    this.lastActiveAt = this.now();
   }
 
   getLastSpoken(): string | null {
@@ -105,6 +108,11 @@ export class SpeechQueue {
 
   isBusy(): boolean {
     return this.speaking !== null || this.pending !== null;
+  }
+
+  /** True when nothing is speaking or waiting, and has not been for `ms`. */
+  isQuietFor(ms: number): boolean {
+    return !this.isBusy() && this.now() - this.lastActiveAt >= ms;
   }
 
   private isDuplicate(text: string): boolean {
@@ -116,12 +124,14 @@ export class SpeechQueue {
     this.generation += 1;
     const generation = this.generation;
     this.speaking = utterance;
+    this.lastActiveAt = this.now();
     this.lastSpoken = utterance.text;
     this.recent.set(utterance.text, this.now());
 
     const finish = () => {
       if (generation !== this.generation) return;
       this.speaking = null;
+      this.lastActiveAt = this.now();
       const next = this.pending;
       this.pending = null;
       if (next) this.start(next);
