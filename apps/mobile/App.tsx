@@ -17,6 +17,8 @@ import {
 import { SosModal } from "./src/sos/SosModal";
 import type { SosReason } from "./src/sos/sosMachine";
 import { useSos } from "./src/sos/useSos";
+import { SettingsPanel } from "./src/settings/SettingsPanel";
+import { getSettings } from "./src/settings/settingsStore";
 
 import { HomeScreen, type UserViewMode } from "./src/screens/HomeScreen";
 import { HELP_TEXT, parseCommand } from "./src/voice/commands";
@@ -62,9 +64,7 @@ export default function App() {
     haptic: (kind) => {
       cue(kind === "tick" ? "straight" : kind === "warning" ? "hazard" : "confirm");
     },
-    // Settings are not part of this branch yet, so SOS uses the default demo
-    // number. Pass the saved emergency contact here once settings are merged.
-    getContact: () => null,
+    getContact: () => getSettings().emergencyContact,
   });
   sosTriggerRef.current = sos.trigger;
 
@@ -389,6 +389,9 @@ export default function App() {
           label="Read Current Status Aloud"
           onPress={announceStatus}
         />
+
+        <Text style={styles.sectionTitle}>Settings</Text>
+        <SettingsPanel />
 
         <View
           accessible
