@@ -194,27 +194,13 @@ export default function App() {
     speak(text, "info", { force: true });
   }
 
-  // The mic button is a fallback and a reminder: voice is always on, so it
-  // explains what to say, or tries to turn listening on if it is off.
-  async function handleSpeakPress() {
+  // "Tap to chat" does not take voice input. It opens the navigation view and
+  // reads out the navigation details (and repeats them if already navigating).
+  function handleSpeakPress() {
     cue("confirm");
-    if (voice.status === "listening") {
-      say(HELP_TEXT);
-      return;
-    }
-    if (voice.status === "unavailable") {
-      say(
-        "Voice input needs a development build and is not available yet. " +
-          "Switch to dev view to use the buttons."
-      );
-      return;
-    }
-    await voice.enable();
-    say(
-      voice.status === "denied"
-        ? "Microphone access is off. Turn it on in Settings to use your voice."
-        : "I am listening. " + HELP_TEXT
-    );
+    if (sosActive) return;
+    if (navigationActive) announceStatus();
+    else startNavigation();
   }
 
   // Only called while SOS is idle: during SOS the router accepts SOS replies only.
@@ -272,9 +258,7 @@ export default function App() {
         destination={DEMO_DESTINATION}
         instruction={DEMO_INSTRUCTION}
         listening={listening}
-        onSpeakPress={() => {
-          void handleSpeakPress();
-        }}
+        onSpeakPress={handleSpeakPress}
         onRepeatPress={announceStatus}
         onOpenDevView={() => setScreen("tools")}
         sos={sos.state}

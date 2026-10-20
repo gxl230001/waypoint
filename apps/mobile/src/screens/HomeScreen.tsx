@@ -114,7 +114,7 @@ function IdleChat({
         onPress={onSpeakPress}
         accessibilityRole="button"
         accessibilityLabel={listening ? "Listening" : "Tap to chat"}
-        accessibilityHint="Then say a command, such as start navigation, stop, repeat, or help me."
+        accessibilityHint="Starts navigation and reads out the directions."
         accessibilityState={{ busy: listening }}
         activeOpacity={0.85}
       >
