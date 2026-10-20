@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ViewToggle } from "../components/ViewToggle";
 import { describeDemoCall, targetLabel, type SosState } from "../sos/sosMachine";
 
@@ -363,9 +364,11 @@ function SpeakerIcon() {
 function TurnGlyph() {
   return (
     <View style={styles.turnGlyph}>
-      <View style={styles.turnStem} />
-      <View style={styles.turnArc} />
-      <View style={styles.turnHead} />
+      <MaterialCommunityIcons
+        name="arrow-left-top-bold"
+        size={176}
+        color="#FFFFFF"
+      />
       <View style={styles.turnDot} />
     </View>
   );
@@ -613,50 +616,18 @@ const styles = StyleSheet.create({
     height: 56,
   },
   turnGlyph: {
-    width: 220,
-    height: 180,
-  },
-  turnStem: {
-    position: "absolute",
-    left: 28,
-    top: 88,
-    width: 18,
-    height: 78,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 9,
-  },
-  turnArc: {
-    position: "absolute",
-    left: 28,
-    top: 18,
-    width: 118,
-    height: 88,
-    borderTopWidth: 18,
-    borderRightWidth: 18,
-    borderColor: "#FFFFFF",
-    borderTopRightRadius: 90,
-    backgroundColor: "transparent",
-  },
-  turnHead: {
-    position: "absolute",
-    left: 122,
-    top: 78,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 22,
-    borderRightWidth: 22,
-    borderTopWidth: 34,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: "#FFFFFF",
+    width: 230,
+    height: 190,
+    alignItems: "center",
+    justifyContent: "center",
   },
   turnDot: {
     position: "absolute",
-    right: 18,
-    top: 64,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    right: 6,
+    top: 74,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: "#FFFFFF",
   },
 });
