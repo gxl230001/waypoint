@@ -27,6 +27,12 @@ test("recognizes each command", () => {
   }
 });
 
+test("okay and false-alarm phrases dismiss SOS instead of triggering it", () => {
+  for (const text of ["I am okay", "I'm fine", "false alarm", "cancel SOS"]) {
+    assert.equal(parseCommand(text), "cancelSos", text);
+  }
+});
+
 test("emergency phrases always win over other commands", () => {
   for (const text of [
     "help me",

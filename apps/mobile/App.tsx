@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -15,13 +15,17 @@ import {
   type ImuSummary,
 } from "./src/imu/ImuCollectionPanel";
 
-import { HomeScreen } from "./src/screens/HomeScreen";
+import { HomeScreen, type UserViewMode } from "./src/screens/HomeScreen";
 import { HELP_TEXT, parseCommand } from "./src/voice/commands";
 import { unavailableRecognizer, type VoiceRecognizer } from "./src/voice/recognizer";
 import { cue } from "./src/services/haptics";
 import { speak, stopSpeaking } from "./src/services/speech";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+const DEMO_DESTINATION = "JO 4.102";
+const DEMO_INSTRUCTION = "Keep walking 40 steps\nTurn left in 2 minutes";
+const SOS_MESSAGE = "SOS. Please respond.";
 
 // Replace with a real recognizer once a development build includes speech
 // recognition. See src/voice/recognizer.ts.
@@ -38,23 +42,16 @@ export default function App() {
     totalSamples: 0,
   });
   const [fallAlert, setFallAlert] = useState<{ probability: number } | null>(null);
+  const [sosActive, setSosActive] = useState(false);
   const [message, setMessage] = useState(
-    "Welcome. Your navigation prototype is ready."
+    "Welcome. Tap to chat, or start navigation."
   );
-
-  const fallAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleFall = useCallback((probability: number) => {
     setFallAlert({ probability });
-    if (fallAlertTimerRef.current) {
-      clearTimeout(fallAlertTimerRef.current);
-    }
-    fallAlertTimerRef.current = setTimeout(() => {
-      setFallAlert(null);
-      fallAlertTimerRef.current = null;
-    }, 5000);
-
-    speak("Fall detected", "hazard");
+    setSosActive(true);
+    setMessage(SOS_MESSAGE);
+    speak(SOS_MESSAGE, "hazard");
     cue("hazard");
   }, []);
 
@@ -63,13 +60,17 @@ export default function App() {
     onFall: handleFall,
   });
 
-  // Sensor subscriptions are owned by the IMU panel's recorder hook, which
-  // removes them on stop, on backgrounding, and on unmount.
+  const startFallDetection = fallDetector.start;
+
+  // Listen for falls and trips whenever the user view is showing.
+  useEffect(() => {
+    if (screen === "home" && !imu.recording) {
+      void startFallDetection();
+    }
+  }, [screen, imu.recording, startFallDetection]);
+
   useEffect(() => {
     return () => {
-      if (fallAlertTimerRef.current) {
-        clearTimeout(fallAlertTimerRef.current);
-      }
       stopSpeaking();
     };
   }, []);
@@ -106,21 +107,35 @@ export default function App() {
 
   function startNavigation() {
     setNavigationActive(true);
-    setMessage("Demo navigation started. Real route guidance is not implemented.");
-
-    speak(
-      "Demo navigation started. Real route guidance is not implemented.",
-      "direction"
-    );
+    const spoken = `Headed to ${DEMO_DESTINATION}. ${DEMO_INSTRUCTION.replace(/\n/g, ". ")}`;
+    setMessage(spoken);
+    speak(spoken, "direction");
     cue("confirm");
   }
 
   function stopNavigation() {
     setNavigationActive(false);
     setMessage("Navigation stopped.");
-
     speak("Navigation stopped.", "direction");
     cue("warning");
+  }
+
+  function activateSos() {
+    setSosActive(true);
+    setMessage(SOS_MESSAGE);
+    speak(SOS_MESSAGE, "hazard");
+    cue("hazard");
+  }
+
+  function dismissSos() {
+    setSosActive(false);
+    setFallAlert(null);
+    const next = navigationActive
+      ? `Headed to ${DEMO_DESTINATION}. ${DEMO_INSTRUCTION.replace(/\n/g, ". ")}`
+      : "SOS cancelled.";
+    setMessage(next);
+    speak(next, "direction", { force: true });
+    cue("confirm");
   }
 
   function testHaptics() {
@@ -134,13 +149,12 @@ export default function App() {
 
   function say(text: string) {
     setMessage(text);
-    Speech.stop();
-    Speech.speak(text);
+    speak(text, "info", { force: true });
   }
 
   async function handleSpeakPress() {
     if (listening) return;
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    cue("confirm");
 
     if (!recognizer.isAvailable()) {
       say(
@@ -169,10 +183,18 @@ export default function App() {
   function runCommand(command: ReturnType<typeof parseCommand>) {
     switch (command) {
       case "startNavigation":
+        if (sosActive) {
+          say("SOS is active. Say I am okay to cancel it first.");
+          break;
+        }
         if (!navigationActive) startNavigation();
         else say("Navigation is already running.");
         break;
       case "stopNavigation":
+        if (sosActive) {
+          dismissSos();
+          break;
+        }
         if (navigationActive) stopNavigation();
         else say("Navigation is not running.");
         break;
@@ -180,9 +202,13 @@ export default function App() {
         announceStatus();
         break;
       case "status":
+        if (sosActive) {
+          say(SOS_MESSAGE);
+          break;
+        }
         say(
           navigationActive
-            ? "Demo navigation is running."
+            ? `Headed to ${DEMO_DESTINATION}.`
             : "Navigation is stopped."
         );
         break;
@@ -190,7 +216,11 @@ export default function App() {
         setScreen("tools");
         break;
       case "sos":
-        say("Emergency help is not connected in this build yet.");
+        activateSos();
+        break;
+      case "cancelSos":
+        if (sosActive) dismissSos();
+        else say("SOS is not active.");
         break;
       case "help":
         say(HELP_TEXT);
@@ -200,10 +230,18 @@ export default function App() {
     }
   }
 
+  const userMode: UserViewMode = sosActive
+    ? "sos"
+    : navigationActive
+      ? "navigating"
+      : "idle";
+
   if (screen === "home") {
     return (
       <HomeScreen
-        message={message}
+        mode={userMode}
+        destination={DEMO_DESTINATION}
+        instruction={DEMO_INSTRUCTION}
         listening={listening}
         onSpeakPress={() => {
           void handleSpeakPress();

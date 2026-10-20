@@ -5,10 +5,12 @@ type ViewToggleProps = {
   label: string;
   hint: string;
   onPress: () => void;
+  /** White outline for the blue and red user screens. */
+  onDark?: boolean;
 };
 
 /** Small pill in the top right corner that switches between user and dev view. */
-export function ViewToggle({ label, hint, onPress }: ViewToggleProps) {
+export function ViewToggle({ label, hint, onPress, onDark = false }: ViewToggleProps) {
   return (
     <View style={styles.row}>
       <TouchableOpacity
@@ -17,9 +19,9 @@ export function ViewToggle({ label, hint, onPress }: ViewToggleProps) {
         accessibilityHint={hint}
         onPress={onPress}
         activeOpacity={0.75}
-        style={styles.pill}
+        style={[styles.pill, onDark && styles.pillOnDark]}
       >
-        <Text style={styles.text}>{label}</Text>
+        <Text style={[styles.text, onDark && styles.textOnDark]}>{label}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -47,5 +49,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: "#14213D",
+  },
+  pillOnDark: {
+    borderColor: "rgba(255, 255, 255, 0.7)",
+    backgroundColor: "transparent",
+  },
+  textOnDark: {
+    color: "#FFFFFF",
   },
 });

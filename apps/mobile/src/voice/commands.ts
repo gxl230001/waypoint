@@ -7,6 +7,7 @@
  * a request for emergency help is checked first.
  */
 export type VoiceCommand =
+  | "cancelSos"
   | "sos"
   | "repeat"
   | "settings"
@@ -17,6 +18,11 @@ export type VoiceCommand =
   | "unknown";
 
 const RULES: ReadonlyArray<{ command: VoiceCommand; pattern: RegExp }> = [
+  {
+    command: "cancelSos",
+    pattern:
+      /\b(cancel sos|false alarm|i am okay|im okay|i am ok|im ok|i am fine|im fine)\b/,
+  },
   {
     command: "sos",
     pattern:
@@ -49,4 +55,4 @@ export function parseCommand(text: string): VoiceCommand {
 }
 
 export const HELP_TEXT =
-  "You can say: start navigation, stop, repeat, status, settings, or help me for emergencies.";
+  "You can say: start navigation, stop, repeat, status, settings, I am okay, or help me for emergencies.";
