@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -6,9 +6,8 @@ import {
   Text,
   View,
 } from "react-native";
-import * as Haptics from "expo-haptics";
-import * as Speech from "expo-speech";
 import { ActionButton } from "./src/components/ActionButton";
+import { ViewToggle } from "./src/components/ViewToggle";
 import { TrialCounters } from "./src/fall/TrialCounters";
 import { useFallDetector } from "./src/fall/useFallDetector";
 import {
@@ -18,9 +17,25 @@ import {
 import { SosModal } from "./src/sos/SosModal";
 import { useSos } from "./src/sos/useSos";
 
+import { HomeScreen, type UserViewMode } from "./src/screens/HomeScreen";
+import { HELP_TEXT, parseCommand } from "./src/voice/commands";
+import { unavailableRecognizer, type VoiceRecognizer } from "./src/voice/recognizer";
+import { cue } from "./src/services/haptics";
+import { speak, stopSpeaking } from "./src/services/speech";
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+const DEMO_DESTINATION = "JO 4.102";
+const DEMO_INSTRUCTION = "Keep walking 40 steps\nTurn left in 2 minutes";
+const SOS_MESSAGE = "SOS. Please respond.";
+
+// Replace with a real recognizer once a development build includes speech
+// recognition. See src/voice/recognizer.ts.
+const recognizer: VoiceRecognizer = unavailableRecognizer;
+
 export default function App() {
+  const [screen, setScreen] = useState<"home" | "tools">("home");
+  const [listening, setListening] = useState(false);
   const [apiStatus, setApiStatus] = useState("Not checked");
   const [navigationActive, setNavigationActive] = useState(false);
   const [imu, setImu] = useState<ImuSummary>({
@@ -29,25 +44,17 @@ export default function App() {
     totalSamples: 0,
   });
   const [fallAlert, setFallAlert] = useState<{ probability: number } | null>(null);
+  const [sosActive, setSosActive] = useState(false);
   const [message, setMessage] = useState(
-    "Welcome. Your navigation prototype is ready."
+    "Welcome. Tap to chat, or start navigation."
   );
-
-  const fallAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleFall = useCallback((probability: number) => {
     setFallAlert({ probability });
-    if (fallAlertTimerRef.current) {
-      clearTimeout(fallAlertTimerRef.current);
-    }
-    fallAlertTimerRef.current = setTimeout(() => {
-      setFallAlert(null);
-      fallAlertTimerRef.current = null;
-    }, 5000);
-
-    Speech.stop();
-    Speech.speak("Fall detected");
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    setSosActive(true);
+    setMessage(SOS_MESSAGE);
+    speak(SOS_MESSAGE, "hazard");
+    cue("hazard");
   }, []);
 
   const sos = useSos({
@@ -74,14 +81,18 @@ export default function App() {
     onFall: handleFall,
   });
 
-  // Sensor subscriptions are owned by the IMU panel's recorder hook, which
-  // removes them on stop, on backgrounding, and on unmount.
+  const startFallDetection = fallDetector.start;
+
+  // Listen for falls and trips whenever the user view is showing.
+  useEffect(() => {
+    if (screen === "home" && !imu.recording) {
+      void startFallDetection();
+    }
+  }, [screen, imu.recording, startFallDetection]);
+
   useEffect(() => {
     return () => {
-      if (fallAlertTimerRef.current) {
-        clearTimeout(fallAlertTimerRef.current);
-      }
-      Speech.stop();
+      stopSpeaking();
     };
   }, []);
 
@@ -117,34 +128,158 @@ export default function App() {
 
   function startNavigation() {
     setNavigationActive(true);
-    setMessage("Demo navigation started. Real route guidance is not implemented.");
-
-    Speech.speak(
-      "Demo navigation started. Real route guidance is not implemented."
-    );
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const spoken = `Headed to ${DEMO_DESTINATION}. ${DEMO_INSTRUCTION.replace(/\n/g, ". ")}`;
+    setMessage(spoken);
+    speak(spoken, "direction");
+    cue("confirm");
   }
 
   function stopNavigation() {
     setNavigationActive(false);
     setMessage("Navigation stopped.");
-
-    Speech.stop();
-    Speech.speak("Navigation stopped.");
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    speak("Navigation stopped.", "direction");
+    cue("warning");
   }
 
-  async function testHaptics() {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  function activateSos() {
+    setSosActive(true);
+    setMessage(SOS_MESSAGE);
+    speak(SOS_MESSAGE, "hazard");
+    cue("hazard");
+  }
+
+  function dismissSos() {
+    setSosActive(false);
+    setFallAlert(null);
+    const next = navigationActive
+      ? `Headed to ${DEMO_DESTINATION}. ${DEMO_INSTRUCTION.replace(/\n/g, ". ")}`
+      : "SOS cancelled.";
+    setMessage(next);
+    speak(next, "direction", { force: true });
+    cue("confirm");
+  }
+
+  function testHaptics() {
+    cue("straight");
     setMessage("Haptic feedback test completed.");
   }
 
   function announceStatus() {
-    Speech.speak(message);
+    speak(message, "direction", { force: true });
+  }
+
+  function say(text: string) {
+    setMessage(text);
+    speak(text, "info", { force: true });
+  }
+
+  async function handleSpeakPress() {
+    if (listening) return;
+    cue("confirm");
+
+    if (!recognizer.isAvailable()) {
+      say(
+        "Voice input needs a development build and is not available yet. " +
+          "Switch to dev view to use the buttons."
+      );
+      return;
+    }
+
+    setListening(true);
+    try {
+      const heard = await recognizer.listen();
+      if (heard === null) {
+        say("I did not hear anything. Tap to speak and try again.");
+        return;
+      }
+      runCommand(parseCommand(heard));
+    } catch (error) {
+      console.error("Voice input failed:", error);
+      say("Voice input failed. Please try again.");
+    } finally {
+      setListening(false);
+    }
+  }
+
+  function runCommand(command: ReturnType<typeof parseCommand>) {
+    switch (command) {
+      case "startNavigation":
+        if (sosActive) {
+          say("SOS is active. Say I am okay to cancel it first.");
+          break;
+        }
+        if (!navigationActive) startNavigation();
+        else say("Navigation is already running.");
+        break;
+      case "stopNavigation":
+        if (sosActive) {
+          dismissSos();
+          break;
+        }
+        if (navigationActive) stopNavigation();
+        else say("Navigation is not running.");
+        break;
+      case "repeat":
+        announceStatus();
+        break;
+      case "status":
+        if (sosActive) {
+          say(SOS_MESSAGE);
+          break;
+        }
+        say(
+          navigationActive
+            ? `Headed to ${DEMO_DESTINATION}.`
+            : "Navigation is stopped."
+        );
+        break;
+      case "settings":
+        setScreen("tools");
+        break;
+      case "sos":
+        activateSos();
+        break;
+      case "cancelSos":
+        if (sosActive) dismissSos();
+        else say("SOS is not active.");
+        break;
+      case "help":
+        say(HELP_TEXT);
+        break;
+      default:
+        say("Sorry, I did not understand. Say help to hear what you can say.");
+    }
+  }
+
+  const userMode: UserViewMode = sosActive
+    ? "sos"
+    : navigationActive
+      ? "navigating"
+      : "idle";
+
+  if (screen === "home") {
+    return (
+      <HomeScreen
+        mode={userMode}
+        destination={DEMO_DESTINATION}
+        instruction={DEMO_INSTRUCTION}
+        listening={listening}
+        onSpeakPress={() => {
+          void handleSpeakPress();
+        }}
+        onRepeatPress={announceStatus}
+        onOpenDevView={() => setScreen("tools")}
+      />
+    );
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ViewToggle
+        label="User view"
+        hint="Switches to the simple user view with the speak button."
+        onPress={() => setScreen("home")}
+      />
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.eyebrow}>ACCESSIBLE MOBILITY</Text>
         <Text style={styles.title}>Waypoint</Text>
