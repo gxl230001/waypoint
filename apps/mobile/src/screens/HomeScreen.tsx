@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   turnArrow: {
-    transform: [{ rotate: "-14deg" }],
+    transform: [{ translateX: -24 }],
   },
   instructionRaised: {
     marginBottom: 40,
