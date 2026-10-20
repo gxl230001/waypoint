@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -15,6 +15,7 @@ import {
   type ImuSummary,
 } from "./src/imu/ImuCollectionPanel";
 import { SosModal } from "./src/sos/SosModal";
+import type { SosReason } from "./src/sos/sosMachine";
 import { useSos } from "./src/sos/useSos";
 
 import { HomeScreen, type UserViewMode } from "./src/screens/HomeScreen";
@@ -27,7 +28,6 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const DEMO_DESTINATION = "JO 4.102";
 const DEMO_INSTRUCTION = "Keep walking 40 steps\nTurn left in 2 minutes";
-const SOS_MESSAGE = "SOS. Please respond.";
 
 // Replace with a real recognizer once a development build includes speech
 // recognition. See src/voice/recognizer.ts.
@@ -44,37 +44,50 @@ export default function App() {
     totalSamples: 0,
   });
   const [fallAlert, setFallAlert] = useState<{ probability: number } | null>(null);
-  const [sosActive, setSosActive] = useState(false);
   const [message, setMessage] = useState(
     "Welcome. Tap to chat, or start navigation."
   );
 
+  const sosTriggerRef = useRef<(reason?: SosReason) => void>(() => {});
+
   const handleFall = useCallback((probability: number) => {
     setFallAlert({ probability });
-    setSosActive(true);
-    setMessage(SOS_MESSAGE);
-    speak(SOS_MESSAGE, "hazard");
-    cue("hazard");
+    sosTriggerRef.current("fall");
   }, []);
 
   const sos = useSos({
     speak: (text) => {
-      Speech.stop();
-      Speech.speak(text);
+      speak(text, "hazard", { force: true });
     },
     haptic: (kind) => {
-      if (kind === "tick") {
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } else if (kind === "warning") {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      } else {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
+      cue(kind === "tick" ? "straight" : kind === "warning" ? "hazard" : "confirm");
     },
     // Settings are not part of this branch yet, so SOS uses the default demo
     // number. Pass the saved emergency contact here once settings are merged.
     getContact: () => null,
   });
+  sosTriggerRef.current = sos.trigger;
+
+  const sosActive = sos.state.phase !== "idle";
+
+  // When the SOS flow ends (cancelled, or "Done" after the demo call), drop
+  // back to the user view so the person is not left on the developer tools.
+  const sosWasActive = useRef(false);
+  useEffect(() => {
+    if (sosActive) {
+      sosWasActive.current = true;
+      return;
+    }
+    if (!sosWasActive.current) return;
+    sosWasActive.current = false;
+    setScreen("home");
+    setFallAlert(null);
+    setMessage(
+      navigationActive
+        ? `Headed to ${DEMO_DESTINATION}. ${DEMO_INSTRUCTION.replace(/\n/g, ". ")}`
+        : "Back to the main screen."
+    );
+  }, [sosActive, navigationActive]);
 
   const fallDetector = useFallDetector({
     apiUrl: API_URL,
@@ -141,22 +154,9 @@ export default function App() {
     cue("warning");
   }
 
-  function activateSos() {
-    setSosActive(true);
-    setMessage(SOS_MESSAGE);
-    speak(SOS_MESSAGE, "hazard");
-    cue("hazard");
-  }
-
-  function dismissSos() {
-    setSosActive(false);
-    setFallAlert(null);
-    const next = navigationActive
-      ? `Headed to ${DEMO_DESTINATION}. ${DEMO_INSTRUCTION.replace(/\n/g, ". ")}`
-      : "SOS cancelled.";
-    setMessage(next);
-    speak(next, "direction", { force: true });
-    cue("confirm");
+  function cancelOrDismissSos() {
+    if (sos.state.phase === "called") sos.dismiss();
+    else sos.cancel();
   }
 
   function testHaptics() {
@@ -213,7 +213,7 @@ export default function App() {
         break;
       case "stopNavigation":
         if (sosActive) {
-          dismissSos();
+          cancelOrDismissSos();
           break;
         }
         if (navigationActive) stopNavigation();
@@ -224,7 +224,7 @@ export default function App() {
         break;
       case "status":
         if (sosActive) {
-          say(SOS_MESSAGE);
+          say("SOS is active.");
           break;
         }
         say(
@@ -237,10 +237,10 @@ export default function App() {
         setScreen("tools");
         break;
       case "sos":
-        activateSos();
+        sos.trigger("voice");
         break;
       case "cancelSos":
-        if (sosActive) dismissSos();
+        if (sosActive) cancelOrDismissSos();
         else say("SOS is not active.");
         break;
       case "help":
