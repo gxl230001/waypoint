@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ViewToggle } from "../components/ViewToggle";
 
 export type UserViewMode = "idle" | "navigating" | "sos";
@@ -22,10 +23,11 @@ type HomeScreenProps = {
   onOpenDevView: () => void;
 };
 
-const BLUE = "#1B4FE0";
-const RED = "#C4161C";
-const SOS_BADGE = "#E31B23";
-const PILL_FILL = "rgba(255, 255, 255, 0.28)";
+const BLUE = "#19489B";
+const RED = "#B80D18";
+const SOS_BADGE = "#F22B1D";
+const BLUE_CARD = "#DCE7F8";
+const RED_CARD = "#F3D5D8";
 
 /**
  * User-facing screens from the Figma prototype:
@@ -46,40 +48,46 @@ export function HomeScreen({
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor }]}>
       <StatusBar style="light" />
-      <ViewToggle
-        label="Dev view"
-        hint="Switches to the developer view with settings, sensors and test tools."
-        onPress={onOpenDevView}
-        onDark
-      />
+      <View style={styles.screen}>
+        <View style={styles.header}>
+          <Text
+            accessibilityRole="header"
+            style={styles.logo}
+            importantForAccessibility="no"
+          >
+            waypoint
+          </Text>
+          <View style={styles.devToggle}>
+            <ViewToggle
+              label="Dev"
+              hint="Switches to the developer view with settings, sensors and test tools."
+              onPress={onOpenDevView}
+              onDark
+              compact
+            />
+          </View>
+        </View>
 
-      <Text
-        accessibilityRole="header"
-        style={styles.logo}
-        importantForAccessibility="no"
-      >
-        waypoint
-      </Text>
+        {mode === "idle" ? (
+          <IdleChat listening={listening} onSpeakPress={onSpeakPress} />
+        ) : null}
 
-      {mode === "idle" ? (
-        <IdleChat listening={listening} onSpeakPress={onSpeakPress} />
-      ) : null}
+        {mode === "navigating" ? (
+          <NavigationView
+            destination={destination}
+            instruction={instruction}
+            onRepeatPress={onRepeatPress}
+          />
+        ) : null}
 
-      {mode === "navigating" ? (
-        <NavigationView
-          destination={destination}
-          instruction={instruction}
-          onRepeatPress={onRepeatPress}
-        />
-      ) : null}
-
-      {mode === "sos" ? (
-        <SosView
-          listening={listening}
-          onSpeakPress={onSpeakPress}
-          onRepeatPress={onRepeatPress}
-        />
-      ) : null}
+        {mode === "sos" ? (
+          <SosView
+            listening={listening}
+            onSpeakPress={onSpeakPress}
+            onRepeatPress={onRepeatPress}
+          />
+        ) : null}
+      </View>
     </SafeAreaView>
   );
 }
@@ -102,7 +110,9 @@ function IdleChat({
         accessibilityState={{ busy: listening }}
         activeOpacity={0.85}
       >
-        <ArcLabel text={listening ? "listening..." : "tap to chat"} />
+        <Text style={styles.chatPrompt}>
+          {listening ? "LISTENING…" : "TAP TO CHAT"}
+        </Text>
         <View
           style={[styles.micCircle, listening && styles.micCircleListening]}
         >
@@ -128,15 +138,16 @@ function NavigationView({
         accessible
         accessibilityRole="text"
         accessibilityLabel={`Headed to ${destination}`}
-        style={styles.pill}
+        style={[styles.messageCard, styles.navigationCard]}
       >
-        <Text style={styles.pillText}>Headed to: {destination}</Text>
+        <Text style={styles.destinationLabel}>HEADED TO</Text>
+        <Text style={styles.destinationText}>{destination}</Text>
       </View>
 
       <View
         style={styles.glyphArea}
         accessible
-        accessibilityLabel="Turn right"
+        accessibilityLabel="Turn left"
       >
         <TurnGlyph />
       </View>
@@ -146,7 +157,7 @@ function NavigationView({
         accessibilityRole="text"
         accessibilityLiveRegion="polite"
         accessibilityLabel={instruction.replace(/\n/g, ". ")}
-        style={styles.pill}
+        style={[styles.messageCard, styles.navigationCard]}
       >
         <Text style={styles.instructionText}>{instruction}</Text>
       </View>
@@ -188,10 +199,10 @@ function SosView({
       <View
         accessible
         accessibilityRole="text"
-        style={styles.pill}
+        style={[styles.messageCard, styles.sosMessageCard]}
       >
         <Text style={styles.instructionText}>
-          {listening ? "Listening..." : "SOS\nPlease Respond"}
+          {listening ? "Listening…" : "SOS\nPlease respond"}
         </Text>
       </View>
 
@@ -227,324 +238,207 @@ function SpeakerControl({
       activeOpacity={0.75}
     >
       <SpeakerIcon />
-      <Text style={styles.speakerLabel}>{busy ? "Listening..." : label}</Text>
+      <Text style={styles.speakerLabel}>{busy ? "Listening…" : label}</Text>
     </TouchableOpacity>
   );
 }
 
-function ArcLabel({ text }: { text: string }) {
-  const letters = Array.from(text);
-  const start = -62;
-  const end = 62;
-  const step = letters.length > 1 ? (end - start) / (letters.length - 1) : 0;
-  const radius = 132;
-
-  return (
-    <View pointerEvents="none" style={styles.arcWrap}>
-      {letters.map((letter, index) => {
-        const angle = start + index * step;
-        const rad = (angle * Math.PI) / 180;
-        return (
-          <Text
-            key={`${letter}-${index}`}
-            style={[
-              styles.arcLetter,
-              {
-                transform: [
-                  { translateX: Math.sin(rad) * radius },
-                  { translateY: -Math.cos(rad) * radius },
-                  { rotate: `${angle}deg` },
-                ],
-              },
-            ]}
-          >
-            {letter}
-          </Text>
-        );
-      })}
-    </View>
-  );
-}
-
 function MicIcon() {
-  return (
-    <View style={styles.micIcon}>
-      <View style={styles.micCapsule} />
-      <View style={styles.micYoke} />
-      <View style={styles.micStem} />
-      <View style={styles.micBase} />
-    </View>
-  );
+  return <MaterialCommunityIcons name="microphone" size={92} color={BLUE} />;
 }
 
 function SpeakerIcon() {
   return (
-    <View style={styles.speakerIcon}>
-      <View style={styles.speakerBody} />
-      <View style={styles.speakerHorn} />
-      <View style={[styles.speakerWave, styles.speakerWaveInner]} />
-      <View style={[styles.speakerWave, styles.speakerWaveOuter]} />
-    </View>
+    <MaterialCommunityIcons name="volume-high" size={76} color="#FFFFFF" />
   );
 }
 
 function TurnGlyph() {
   return (
     <View style={styles.turnGlyph}>
-      <View style={styles.turnStem} />
-      <View style={styles.turnArc} />
-      <View style={styles.turnHead} />
+      <MaterialCommunityIcons
+        name="arrow-left-top-bold"
+        size={176}
+        color="#FFFFFF"
+      />
       <View style={styles.turnDot} />
     </View>
   );
 }
 
-const logoFont = Platform.select({
-  ios: "Georgia",
-  android: "serif",
-  default: "serif",
+const readableFont = Platform.select({
+  ios: "System",
+  android: "sans-serif",
+  default: "system-ui",
 });
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  screen: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
+  },
+  header: {
+    height: 88,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  devToggle: {
+    position: "absolute",
+    right: 4,
+    top: 0,
+  },
   logo: {
-    marginTop: 8,
     textAlign: "center",
     color: "#FFFFFF",
-    fontSize: 42,
-    fontFamily: logoFont,
-    fontStyle: "italic",
-    fontWeight: "700",
+    fontSize: 46,
+    lineHeight: 56,
+    fontFamily: readableFont,
+    fontWeight: "800",
+    letterSpacing: -1.2,
   },
   idleBody: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    paddingBottom: 68,
   },
   micHitArea: {
-    width: 280,
-    height: 280,
+    width: 300,
+    minHeight: 300,
     alignItems: "center",
     justifyContent: "center",
   },
+  chatPrompt: {
+    color: "#FFFFFF",
+    fontFamily: readableFont,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: "800",
+    letterSpacing: 1.8,
+    marginBottom: 24,
+    textAlign: "center",
+  },
   micCircle: {
-    width: 196,
-    height: 196,
-    borderRadius: 98,
+    width: 210,
+    height: 210,
+    borderRadius: 105,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#071D46",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+    elevation: 8,
   },
   micCircleListening: {
-    backgroundColor: "#E8F0FF",
-  },
-  arcWrap: {
-    position: "absolute",
-    width: 1,
-    height: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  arcLetter: {
-    position: "absolute",
-    width: 18,
-    textAlign: "center",
-    color: "#FFFFFF",
-    fontSize: 22,
-    fontFamily: logoFont,
-    fontStyle: "italic",
-    fontWeight: "600",
+    backgroundColor: "#EAF1FC",
   },
   stack: {
     flex: 1,
-    paddingHorizontal: 28,
-    paddingBottom: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 18,
     alignItems: "center",
   },
-  pill: {
+  messageCard: {
     marginTop: 20,
     width: "100%",
-    backgroundColor: PILL_FILL,
-    borderRadius: 18,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
   },
-  pillText: {
-    color: "#FFFFFF",
-    fontSize: 22,
-    fontWeight: "700",
+  navigationCard: {
+    backgroundColor: BLUE_CARD,
+  },
+  sosMessageCard: {
+    backgroundColor: RED_CARD,
+  },
+  destinationLabel: {
+    color: BLUE,
+    fontFamily: readableFont,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+    textAlign: "center",
+  },
+  destinationText: {
+    color: BLUE,
+    fontFamily: readableFont,
+    fontSize: 27,
+    lineHeight: 34,
+    fontWeight: "800",
     textAlign: "center",
   },
   instructionText: {
-    color: "#FFFFFF",
-    fontSize: 22,
+    color: "#15264A",
+    fontFamily: readableFont,
+    fontSize: 23,
     fontWeight: "700",
     textAlign: "center",
-    lineHeight: 30,
+    lineHeight: 32,
   },
   glyphArea: {
-    flex: 1,
+    height: 235,
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
   },
   sosBadge: {
     width: "100%",
-    height: 176,
+    maxWidth: 360,
+    height: 190,
     backgroundColor: SOS_BADGE,
-    borderRadius: 28,
+    borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#650008",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
   },
   sosBadgeText: {
     color: "#FFFFFF",
-    fontSize: 92,
-    fontWeight: "800",
+    fontFamily: readableFont,
+    fontSize: 96,
+    lineHeight: 112,
+    fontWeight: "900",
     letterSpacing: 2,
   },
   speakerWrap: {
-    marginTop: "auto",
+    marginTop: 12,
     alignItems: "center",
-    paddingVertical: 12,
-    minHeight: 120,
-    justifyContent: "flex-end",
+    paddingVertical: 6,
+    minHeight: 108,
+    justifyContent: "center",
   },
   speakerLabel: {
     marginTop: 10,
     color: "#FFFFFF",
-    fontSize: 22,
-    fontWeight: "700",
-  },
-  micIcon: {
-    width: 64,
-    height: 92,
-    alignItems: "center",
-  },
-  micCapsule: {
-    width: 34,
-    height: 52,
-    borderRadius: 17,
-    backgroundColor: BLUE,
-  },
-  micYoke: {
-    position: "absolute",
-    top: 18,
-    width: 54,
-    height: 42,
-    borderBottomLeftRadius: 27,
-    borderBottomRightRadius: 27,
-    borderWidth: 6,
-    borderTopWidth: 0,
-    borderColor: BLUE,
-  },
-  micStem: {
-    marginTop: 14,
-    width: 6,
-    height: 16,
-    backgroundColor: BLUE,
-    borderRadius: 3,
-  },
-  micBase: {
-    width: 28,
-    height: 6,
-    backgroundColor: BLUE,
-    borderRadius: 3,
-  },
-  speakerIcon: {
-    width: 92,
-    height: 72,
-    justifyContent: "center",
-  },
-  speakerBody: {
-    position: "absolute",
-    left: 0,
-    top: 22,
-    width: 18,
-    height: 28,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 4,
-  },
-  speakerHorn: {
-    position: "absolute",
-    left: 14,
-    top: 8,
-    width: 0,
-    height: 0,
-    borderTopWidth: 28,
-    borderBottomWidth: 28,
-    borderLeftWidth: 28,
-    borderTopColor: "transparent",
-    borderBottomColor: "transparent",
-    borderLeftColor: "#FFFFFF",
-  },
-  speakerWave: {
-    position: "absolute",
-    borderColor: "#FFFFFF",
-    borderTopWidth: 5,
-    borderRightWidth: 5,
-    borderBottomWidth: 5,
-    borderLeftWidth: 0,
-    borderRadius: 40,
-  },
-  speakerWaveInner: {
-    left: 44,
-    top: 18,
-    width: 22,
-    height: 36,
-  },
-  speakerWaveOuter: {
-    left: 56,
-    top: 8,
-    width: 32,
-    height: 56,
+    fontFamily: readableFont,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: "800",
   },
   turnGlyph: {
-    width: 220,
-    height: 180,
-  },
-  turnStem: {
-    position: "absolute",
-    left: 28,
-    top: 88,
-    width: 18,
-    height: 78,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 9,
-  },
-  turnArc: {
-    position: "absolute",
-    left: 28,
-    top: 18,
-    width: 118,
-    height: 88,
-    borderTopWidth: 18,
-    borderRightWidth: 18,
-    borderColor: "#FFFFFF",
-    borderTopRightRadius: 90,
-    backgroundColor: "transparent",
-  },
-  turnHead: {
-    position: "absolute",
-    left: 122,
-    top: 78,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 22,
-    borderRightWidth: 22,
-    borderTopWidth: 34,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: "#FFFFFF",
+    width: 230,
+    height: 190,
+    alignItems: "center",
+    justifyContent: "center",
   },
   turnDot: {
     position: "absolute",
-    right: 18,
-    top: 64,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    right: 6,
+    top: 74,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: "#FFFFFF",
   },
 });

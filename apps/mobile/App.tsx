@@ -331,7 +331,10 @@ export default function App() {
         <ActionButton
           label="Start Demo Navigation"
           hint="Starts a demonstration. This does not provide real directions."
-          onPress={startNavigation}
+          onPress={() => {
+            startNavigation();
+            setScreen("home");
+          }}
           disabled={navigationActive}
           primary
         />
@@ -339,6 +342,23 @@ export default function App() {
           label="Stop Navigation"
           onPress={stopNavigation}
           disabled={!navigationActive}
+        />
+
+        <Text style={styles.sectionTitle}>Emergency screen preview</Text>
+        <ActionButton
+          label="Show SOS Screen"
+          hint="Opens the emergency screen for design and accessibility testing."
+          onPress={() => {
+            activateSos();
+            setScreen("home");
+          }}
+          disabled={sosActive}
+          primary
+        />
+        <ActionButton
+          label="Dismiss SOS"
+          onPress={dismissSos}
+          disabled={!sosActive}
         />
 
         <Text style={styles.sectionTitle}>IMU data collection</Text>
