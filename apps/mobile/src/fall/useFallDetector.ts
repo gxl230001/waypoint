@@ -22,6 +22,11 @@ const PREDICT_INTERVAL_MS = 500;
 const WINDOW_SIZE = 100;
 const PREDICT_TIMEOUT_MS = 2000;
 const COOLDOWN_MS = 5000;
+// Setting a phone down or a bump in a pocket can score above the backend's own
+// 0.5 threshold, so the app is stricter: the score must be high, and stay high
+// for a second prediction in a row (a real fall keeps the impact in the window).
+export const FALL_PROBABILITY = 0.9;
+export const FALL_CONSECUTIVE_WINDOWS = 2;
 
 export function useFallDetector(
   optionsOrUrl?: string | UseFallDetectorOptions,
@@ -54,6 +59,7 @@ export function useFallDetector(
   const latestGyroRef = useRef<[number, number, number] | null>(null);
   const inFlightRef = useRef(false);
   const lastFallAlertTimeRef = useRef(0);
+  const highScoresInARowRef = useRef(0);
 
   const removeSubscriptions = useCallback(() => {
     accSub.current?.remove();
@@ -79,6 +85,7 @@ export function useFallDetector(
     bufferRef.current = [];
     latestGyroRef.current = null;
     inFlightRef.current = false;
+    highScoresInARowRef.current = 0;
   }, [removeSubscriptions, stopInterval]);
 
   const tickPredict = useCallback(async () => {
@@ -126,7 +133,10 @@ export function useFallDetector(
         setLastError(null);
       }
 
-      if (data.fall) {
+      highScoresInARowRef.current =
+        data.probability >= FALL_PROBABILITY ? highScoresInARowRef.current + 1 : 0;
+
+      if (highScoresInARowRef.current >= FALL_CONSECUTIVE_WINDOWS) {
         const now = Date.now();
         if (now - lastFallAlertTimeRef.current >= COOLDOWN_MS) {
           lastFallAlertTimeRef.current = now;
