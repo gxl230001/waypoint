@@ -42,7 +42,7 @@ export default function App() {
   });
   const [fallAlert, setFallAlert] = useState<{ probability: number } | null>(null);
   const [message, setMessage] = useState(
-    "Welcome. Tap to chat, or start navigation."
+    "Welcome. Hold to chat, or start navigation."
   );
 
   const sosTriggerRef = useRef<(reason?: SosReason) => void>(() => {});
@@ -194,7 +194,7 @@ export default function App() {
     speak(text, "info", { force: true });
   }
 
-  // "Tap to chat" does not take voice input. It opens the navigation view and
+  // "Hold to chat" does not take voice input. It opens the navigation view and
   // reads out the navigation details (and repeats them if already navigating).
   function handleSpeakPress() {
     cue("confirm");

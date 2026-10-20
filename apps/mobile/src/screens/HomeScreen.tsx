@@ -114,12 +114,12 @@ function IdleChat({
         style={styles.micHitArea}
         onPress={onSpeakPress}
         accessibilityRole="button"
-        accessibilityLabel={listening ? "Listening" : "Tap to chat"}
+        accessibilityLabel={listening ? "Listening" : "Hold to chat"}
         accessibilityHint="Starts navigation and reads out the directions."
         accessibilityState={{ busy: listening }}
         activeOpacity={0.85}
       >
-        <ArcLabel text={listening ? "listening..." : "tap to chat"} />
+        <ArcLabel text={listening ? "listening..." : "hold to chat"} />
         <View
           style={[styles.micCircle, listening && styles.micCircleListening]}
         >
