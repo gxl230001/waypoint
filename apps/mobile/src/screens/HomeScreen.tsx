@@ -153,7 +153,7 @@ function NavigationView({
       <View
         style={styles.glyphArea}
         accessible
-        accessibilityLabel="Turn right"
+        accessibilityLabel="Turn left"
       >
         <TurnGlyph />
       </View>
@@ -163,15 +163,16 @@ function NavigationView({
         accessibilityRole="text"
         accessibilityLiveRegion="polite"
         accessibilityLabel={instruction.replace(/\n/g, ". ")}
-        style={styles.pill}
+        style={[styles.pill, styles.instructionRaised]}
       >
         <Text style={styles.instructionText}>{instruction}</Text>
       </View>
 
       <SpeakerControl
-        label="Repeat"
-        hint="Double tap to hear the last instruction again."
+        label="Speak"
+        hint="Double tap to hear the directions again."
         onPress={onRepeatPress}
+        prominent
       />
     </View>
   );
@@ -283,11 +284,14 @@ function SpeakerControl({
   hint,
   onPress,
   busy = false,
+  prominent = false,
 }: {
   label: string;
   hint: string;
   onPress: () => void;
   busy?: boolean;
+  /** Larger icon and label, for the main action on the navigation screen. */
+  prominent?: boolean;
 }) {
   return (
     <TouchableOpacity
@@ -299,8 +303,12 @@ function SpeakerControl({
       accessibilityState={{ busy }}
       activeOpacity={0.75}
     >
-      <SpeakerIcon />
-      <Text style={styles.speakerLabel}>{busy ? "Listening..." : label}</Text>
+      <View style={prominent && styles.speakerIconProminent}>
+        <SpeakerIcon />
+      </View>
+      <Text style={[styles.speakerLabel, prominent && styles.speakerLabelProminent]}>
+        {busy ? "Listening..." : label}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -368,6 +376,7 @@ function TurnGlyph() {
         name="arrow-left-top-bold"
         size={176}
         color="#FFFFFF"
+        style={styles.turnArrow}
       />
       <View style={styles.turnDot} />
     </View>
@@ -526,6 +535,14 @@ const styles = StyleSheet.create({
     minHeight: 120,
     justifyContent: "flex-end",
   },
+  speakerLabelProminent: {
+    marginTop: 18,
+    fontSize: 30,
+    fontWeight: "800",
+  },
+  speakerIconProminent: {
+    transform: [{ scale: 1.3 }],
+  },
   speakerLabel: {
     marginTop: 10,
     color: "#FFFFFF",
@@ -620,6 +637,12 @@ const styles = StyleSheet.create({
     height: 190,
     alignItems: "center",
     justifyContent: "center",
+  },
+  turnArrow: {
+    transform: [{ rotate: "-14deg" }],
+  },
+  instructionRaised: {
+    marginBottom: 40,
   },
   turnDot: {
     position: "absolute",
