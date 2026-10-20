@@ -1,11 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  initialWindowMetrics,
+} from "react-native-safe-area-context";
 import { ActionButton } from "./src/components/ActionButton";
 import { ViewToggle } from "./src/components/ViewToggle";
 import { TrialCounters } from "./src/fall/TrialCounters";
@@ -236,148 +240,148 @@ export default function App() {
       ? "navigating"
       : "idle";
 
-  if (screen === "home") {
-    return (
-      <HomeScreen
-        mode={userMode}
-        destination={DEMO_DESTINATION}
-        instruction={DEMO_INSTRUCTION}
-        listening={listening}
-        onSpeakPress={() => {
-          void handleSpeakPress();
-        }}
-        onRepeatPress={announceStatus}
-        onOpenDevView={() => setScreen("tools")}
-      />
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ViewToggle
-        label="User view"
-        hint="Switches to the simple user view with the speak button."
-        onPress={() => setScreen("home")}
-      />
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.eyebrow}>ACCESSIBLE MOBILITY</Text>
-        <Text style={styles.title}>Waypoint</Text>
-        <Text style={styles.subtitle}>
-          Your low-vision navigation MVP
-        </Text>
-
-        <View
-          accessible
-          accessibilityRole="summary"
-          style={styles.statusCard}
-        >
-          <Text style={styles.sectionTitle}>System status</Text>
-          <Text style={styles.statusText}>
-            Backend: {apiStatus}
-          </Text>
-          <Text style={styles.statusText}>
-            Navigation: {navigationActive ? "Active (demo)" : "Stopped"}
-          </Text>
-          <Text style={styles.statusText}>
-            IMU recording:{" "}
-            {imu.recording
-              ? `Recording${imu.activityLabel ? ` (${imu.activityLabel})` : ""}`
-              : "Idle"}
-          </Text>
-          <Text style={styles.statusText}>
-            Samples collected: {imu.totalSamples}
-          </Text>
-          <Text style={styles.statusText}>
-            Fall detection:{" "}
-            {fallDetector.running
-              ? `Running (p=${(fallDetector.probability ?? 0).toFixed(2)})`
-              : "Stopped"}
-          </Text>
-        </View>
-
-        {fallAlert && (
-          <View
-            accessible
-            accessibilityRole="alert"
-            accessibilityLiveRegion="assertive"
-            style={styles.fallBanner}
-          >
-            <Text style={styles.fallBannerTitle}>FALL DETECTED</Text>
-            <Text style={styles.fallBannerSubtitle}>
-              Fall confidence score: {fallAlert.probability.toFixed(2)}
-            </Text>
-          </View>
-        )}
-
-        <Text style={styles.sectionTitle}>Fall detection</Text>
-        <ActionButton
-          label="Start Fall Detection"
-          hint="Starts continuous fall detection model inference."
-          onPress={() => {
-            void fallDetector.start();
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      {screen === "home" ? (
+        <HomeScreen
+          mode={userMode}
+          destination={DEMO_DESTINATION}
+          instruction={DEMO_INSTRUCTION}
+          listening={listening}
+          onSpeakPress={() => {
+            void handleSpeakPress();
           }}
-          disabled={fallDetector.running || imu.recording}
-          primary
+          onRepeatPress={announceStatus}
+          onOpenDevView={() => setScreen("tools")}
         />
-        <ActionButton
-          label="Stop Fall Detection"
-          onPress={fallDetector.stop}
-          disabled={!fallDetector.running}
-        />
-        <TrialCounters />
+      ) : (
+        <SafeAreaView style={styles.safeArea}>
+          <ViewToggle
+            label="User view"
+            hint="Switches to the simple user view with the speak button."
+            onPress={() => setScreen("home")}
+          />
+          <ScrollView contentContainerStyle={styles.container}>
+            <Text style={styles.eyebrow}>ACCESSIBLE MOBILITY</Text>
+            <Text style={styles.title}>Waypoint</Text>
+            <Text style={styles.subtitle}>
+              Your low-vision navigation MVP
+            </Text>
 
-        <Text style={styles.sectionTitle}>Navigation</Text>
-        <ActionButton
-          label="Start Demo Navigation"
-          hint="Starts a demonstration. This does not provide real directions."
-          onPress={startNavigation}
-          disabled={navigationActive}
-          primary
-        />
-        <ActionButton
-          label="Stop Navigation"
-          onPress={stopNavigation}
-          disabled={!navigationActive}
-        />
+            <View
+              accessible
+              accessibilityRole="summary"
+              style={styles.statusCard}
+            >
+              <Text style={styles.sectionTitle}>System status</Text>
+              <Text style={styles.statusText}>
+                Backend: {apiStatus}
+              </Text>
+              <Text style={styles.statusText}>
+                Navigation: {navigationActive ? "Active (demo)" : "Stopped"}
+              </Text>
+              <Text style={styles.statusText}>
+                IMU recording:{" "}
+                {imu.recording
+                  ? `Recording${imu.activityLabel ? ` (${imu.activityLabel})` : ""}`
+                  : "Idle"}
+              </Text>
+              <Text style={styles.statusText}>
+                Samples collected: {imu.totalSamples}
+              </Text>
+              <Text style={styles.statusText}>
+                Fall detection:{" "}
+                {fallDetector.running
+                  ? `Running (p=${(fallDetector.probability ?? 0).toFixed(2)})`
+                  : "Stopped"}
+              </Text>
+            </View>
 
-        <Text style={styles.sectionTitle}>IMU data collection</Text>
-        <ImuCollectionPanel
-          apiUrl={API_URL}
-          onMessage={handleImuMessage}
-          onSummaryChange={handleImuSummary}
-        />
+            {fallAlert && (
+              <View
+                accessible
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+                style={styles.fallBanner}
+              >
+                <Text style={styles.fallBannerTitle}>FALL DETECTED</Text>
+                <Text style={styles.fallBannerSubtitle}>
+                  Fall confidence score: {fallAlert.probability.toFixed(2)}
+                </Text>
+              </View>
+            )}
 
-        <Text style={styles.sectionTitle}>Device and backend</Text>
-        <ActionButton
-          label="Test Haptic Feedback"
-          onPress={testHaptics}
-        />
-        <ActionButton
-          label="Check Backend Connection"
-          onPress={checkBackend}
-        />
-        <ActionButton
-          label="Read Current Status Aloud"
-          onPress={announceStatus}
-        />
+            <Text style={styles.sectionTitle}>Fall detection</Text>
+            <ActionButton
+              label="Start Fall Detection"
+              hint="Starts continuous fall detection model inference."
+              onPress={() => {
+                void fallDetector.start();
+              }}
+              disabled={fallDetector.running || imu.recording}
+              primary
+            />
+            <ActionButton
+              label="Stop Fall Detection"
+              onPress={fallDetector.stop}
+              disabled={!fallDetector.running}
+            />
+            <TrialCounters />
 
-        <View
-          accessible
-          accessibilityLiveRegion="polite"
-          style={styles.messageCard}
-        >
-          <Text style={styles.sectionTitle}>Latest update</Text>
-          <Text style={styles.message}>{message}</Text>
-        </View>
+            <Text style={styles.sectionTitle}>Navigation</Text>
+            <ActionButton
+              label="Start Demo Navigation"
+              hint="Starts a demonstration. This does not provide real directions."
+              onPress={startNavigation}
+              disabled={navigationActive}
+              primary
+            />
+            <ActionButton
+              label="Stop Navigation"
+              onPress={stopNavigation}
+              disabled={!navigationActive}
+            />
 
-        <Text style={styles.disclaimer}>
-          Prototype only. No real route guidance or obstacle detection is
-          available yet. Sensor recordings are experimental research data,
-          saved on this device as CSV files. They are uploaded only when you
-          tap Upload to Backend.
-        </Text>
-      </ScrollView>
-    </SafeAreaView>
+            <Text style={styles.sectionTitle}>IMU data collection</Text>
+            <ImuCollectionPanel
+              apiUrl={API_URL}
+              onMessage={handleImuMessage}
+              onSummaryChange={handleImuSummary}
+            />
+
+            <Text style={styles.sectionTitle}>Device and backend</Text>
+            <ActionButton
+              label="Test Haptic Feedback"
+              onPress={testHaptics}
+            />
+            <ActionButton
+              label="Check Backend Connection"
+              onPress={checkBackend}
+            />
+            <ActionButton
+              label="Read Current Status Aloud"
+              onPress={announceStatus}
+            />
+
+            <View
+              accessible
+              accessibilityLiveRegion="polite"
+              style={styles.messageCard}
+            >
+              <Text style={styles.sectionTitle}>Latest update</Text>
+              <Text style={styles.message}>{message}</Text>
+            </View>
+
+            <Text style={styles.disclaimer}>
+              Prototype only. No real route guidance or obstacle detection is
+              available yet. Sensor recordings are experimental research data,
+              saved on this device as CSV files. They are uploaded only when you
+              tap Upload to Backend.
+            </Text>
+          </ScrollView>
+        </SafeAreaView>
+      )}
+    </SafeAreaProvider>
   );
 }
 
